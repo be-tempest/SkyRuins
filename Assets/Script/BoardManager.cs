@@ -4,28 +4,35 @@ using UnityEngine;
 
 public class BoardManager : MonoBehaviour
 {
-    // -----------------------------
-    // 定義 / フィールド
-    // -----------------------------
+    // ------------- 定数 / フィールド -------------
     public static BoardManager Instance { get; private set; }
 
     public GameObject blockPrefab;
-    public GameObject itemPrefab;
     public GameObject obstaclePrefab;
     public GameObject playerPrefab;
+    // 3種類のアイテムプレハブをセット（Inspectorで3個登録）
+    public GameObject[] itemPrefabs = new GameObject[3];
 
     public int coreSize = 7;      // 1..7 がコア領域
     private int fullSize = 9;     // 0..8 を使う（外枠含む）
 
-    public GameObject[,] grid;    // 土台ブロック参照（index は 0..8）
+    public GameObject[,] grid;       // 土台ブロック参照（index は 0..8）
     private GameObject[,] occupants; // ブロック上のオブジェクト（item/obstacle/player）
-    public int[,] gridData;       // 0=empty,1=item,2=obstacle,3=player
+    public int[,] gridData;          // マップデータ（値は下の定数参照）
+
+    // マップ値（新しい割当）
+    private const int PLAYER = 1;
+    private const int OBSTACLE = 2;
+    private const int ITEM_A = 3;
+    private const int ITEM_B = 4;
+    private const int ITEM_C = 5;
 
     public enum GamePhase { Add, PlayerMove, Slide, Remove }
     public GamePhase phase = GamePhase.Add;
 
     public enum Direction { Left, Up, Right, Down }
 
+    // レベル&追加カウントは従来通り
     private int level = 1;
     private Dictionary<Direction, int> addCount = new Dictionary<Direction, int>()
     {
@@ -37,17 +44,32 @@ public class BoardManager : MonoBehaviour
 
     private List<(int x, int y)> insertedBlocks = new List<(int, int)>();
 
-    // プレイヤーの現在位置（配列インデックス）
+    // プレイヤー状態
     private int playerX;
     private int playerY;
     private GameObject playerObj;
 
-    // アニメ設定
+    // 攻撃ターゲット（前ターンの位置）
+    private int lastPlayerX;
+    private int lastPlayerY;
+    private bool attackPerformedThisSlide = false;
+
+    // ゲームオーバー
+    private bool isGameOver = false;
+
+    // スライドアニメ設定
     [SerializeField] private float slideDuration = 0.28f;
 
-    // -----------------------------
-    // Unity ライフサイクル
-    // -----------------------------
+    // --- 出現確率設定 ---
+    [Header("Spawn Probabilities")]
+    [Range(0f, 1f)] public float itemProbEach = 0.05f; // 各アイテムの個別確率（デフォルト5%）
+    [Range(0f, 1f)] public float obstacleBaseProb = 0.20f; // 障害物ベース確率（デフォルト20%）
+    [Range(0f, 1f)] public float obstacleIncreasePerLevel = 0.02f; // レベル毎の増加量（調整可）
+
+    // プレイヤーが保持しているアイテム数（index 0 = ITEM_A, 1 = ITEM_B, 2 = ITEM_C）
+    private int[] itemsCount = new int[3] { 0, 0, 0 };
+
+    // ---------------- Unity ライフサイクル ----------------
     void Awake()
     {
         Instance = this;
@@ -55,45 +77,70 @@ public class BoardManager : MonoBehaviour
 
     void Start()
     {
-        // 配列初期化
         grid = new GameObject[fullSize, fullSize];
         occupants = new GameObject[fullSize, fullSize];
         gridData = new int[fullSize, fullSize];
 
         InitBoard();
 
-        // プレイヤーを中央に配置（1..7 の中心）
+        // プレイヤーを中央に配置
         int center = coreSize / 2 + 1; // -> 4
         playerX = center;
         playerY = center;
-        gridData[playerX, playerY] = 3;
+        gridData[playerX, playerY] = PLAYER;
         PlaceObjectOnBlock(playerX, playerY);
         playerObj = occupants[playerX, playerY];
+
+        lastPlayerX = playerX;
+        lastPlayerY = playerY;
+        attackPerformedThisSlide = false;
     }
 
     void Update()
     {
-        // フェーズの進行はキーと入力で行う
+        if (isGameOver) return;
+
+        // Add phase
         if (Input.GetKeyDown(KeyCode.A) && phase == GamePhase.Add)
         {
             AddBlocks();
             phase = GamePhase.PlayerMove;
+
+            // 記録（このターンに攻撃が当たる位置 = 現在のプレイヤー位置）
+            lastPlayerX = playerX;
+            lastPlayerY = playerY;
+            attackPerformedThisSlide = false;
             return;
         }
 
+        // PlayerMove phase: check item usage keys first (1/2/3)
         if (phase == GamePhase.PlayerMove)
         {
+            // アイテム使用（1,2,3）
+            if (Input.GetKeyDown(KeyCode.Alpha1)) { UseItem(0); return; }
+            if (Input.GetKeyDown(KeyCode.Alpha2)) { UseItem(1); return; }
+            if (Input.GetKeyDown(KeyCode.Alpha3)) { UseItem(2); return; }
+
             HandlePlayerInput();
             return;
         }
 
-        // Sでスライド開始（コルーチンでアニメ→配列更新）
+        // Slide phase: first perform attack (once)
+        if (phase == GamePhase.Slide && !attackPerformedThisSlide)
+        {
+            PerformAttackAtLastPosition();
+            attackPerformedThisSlide = true;
+            if (isGameOver) return;
+        }
+
+        // S to start slide coroutine (this will start the group-based simultaneous slide)
         if (Input.GetKeyDown(KeyCode.S) && phase == GamePhase.Slide)
         {
             StartCoroutine(SlideBlocksCoroutine(slideDuration));
             return;
         }
 
+        // D to remove
         if (Input.GetKeyDown(KeyCode.D) && phase == GamePhase.Remove)
         {
             RemoveBlocks();
@@ -103,23 +150,18 @@ public class BoardManager : MonoBehaviour
         }
     }
 
-    // -----------------------------
-    // 初期化関連
-    // -----------------------------
+    // ---------------- 初期化 ----------------
     void InitBoard()
     {
-        // コア領域 1..coreSize にブロックを置き、ランダムにitem/obstacle を配置
         for (int x = 1; x <= coreSize; x++)
         {
             for (int y = 1; y <= coreSize; y++)
             {
                 SpawnBlock(x, y);
-                gridData[x, y] = Random.Range(0, 3); // 0=empty,1=item,2=obstacle
+                gridData[x, y] = GenerateCellValueByProbability();
                 PlaceObjectOnBlock(x, y);
             }
         }
-
-        // 外枠（0 と fullSize-1）は空のまま
     }
 
     void SpawnBlock(int x, int y)
@@ -128,9 +170,7 @@ public class BoardManager : MonoBehaviour
         grid[x, y] = Instantiate(blockPrefab, pos, Quaternion.identity, transform);
     }
 
-    // -----------------------------
-    // 入力 / プレイヤー処理（BoardManager内に統合）
-    // -----------------------------
+    // ---------------- プレイヤー入力 ----------------
     void HandlePlayerInput()
     {
         int newX = playerX;
@@ -140,40 +180,42 @@ public class BoardManager : MonoBehaviour
         else if (Input.GetKeyDown(KeyCode.DownArrow)) newY--;
         else if (Input.GetKeyDown(KeyCode.LeftArrow)) newX--;
         else if (Input.GetKeyDown(KeyCode.RightArrow)) newX++;
+        else if (Input.GetKeyDown(KeyCode.Return)) { /* stay */ }
         else return;
 
-        // 範囲チェック（コア領域内のみ許可）
+        // 範囲チェック
         if (newX < 1 || newY < 1 || newX > coreSize || newY > coreSize) return;
 
         int cell = gridData[newX, newY];
-        if (cell == 2) return; // 障害物は不可
+        if (cell == OBSTACLE) return; // 障害物は移動不可
 
-        if (cell == 1)
+        // アイテムを踏む（移動先がアイテムであり、移動したときのみ取得）
+        if ((cell == ITEM_A || cell == ITEM_B || cell == ITEM_C) && !(newX == playerX && newY == playerY))
         {
-            // アイテム取得
-            ConsumeItemAt(newX, newY);
-            Debug.Log("アイテムを取得しました！");
+            int idx = (cell == ITEM_A) ? 0 : (cell == ITEM_B) ? 1 : 2;
+            itemsCount[idx]++;
+            Debug.Log($"Picked up item {(idx + 1)}. Now have {itemsCount[idx]}.");
+            if (occupants[newX, newY] != null) { Destroy(occupants[newX, newY]); occupants[newX, newY] = null; }
+            gridData[newX, newY] = 0;
         }
 
-        // 移動実行（配列とoccupantsを更新, reparent）
-        MovePlayerTo(playerX, playerY, newX, newY, playerObj);
+        // 移動（stay の場合は移動処理をスキップ）
+        if (!(newX == playerX && newY == playerY))
+        {
+            MovePlayerTo(playerX, playerY, newX, newY, playerObj);
+            playerX = newX;
+            playerY = newY;
+        }
 
-        // playerX/Y更新
-        playerX = newX;
-        playerY = newY;
-
-        // 移動したらスライドフェーズへ
+        // 行動したらスライドフェーズへ
         phase = GamePhase.Slide;
     }
 
-    // -----------------------------
-    // レベル / ブロック追加
-    // -----------------------------
+    // ---------------- レベル / 追加 ----------------
     void LevelUp()
     {
         level++;
         Debug.Log("Level Up! " + level);
-
         Direction dirToIncrease = (Direction)((level - 1) % 4);
         addCount[dirToIncrease] = Mathf.Min(3, addCount[dirToIncrease] + 1);
     }
@@ -226,28 +268,31 @@ public class BoardManager : MonoBehaviour
         }
 
         SpawnBlock(x, y);
-        gridData[x, y] = Random.Range(0, 3); // 0=empty,1=item,2=obstacle
+        gridData[x, y] = GenerateCellValueByProbability();
         PlaceObjectOnBlock(x, y);
         insertedBlocks.Add((x, y));
 
-        Debug.Log($"Added {dir} block at ({x},{y})");
+        Debug.Log($"Added {dir} block at ({x},{y}) value={gridData[x,y]}");
     }
 
-    // -----------------------------
-    // helper: 指定の IEnumerator を実行して完了フラグを立てる
-    // -----------------------------
+    // ---------------- 同辺同時スライド処理 ----------------
+    // RunAndFlag wrapper
     private IEnumerator RunAndFlag(IEnumerator routine, List<bool> doneFlags, int index)
     {
+        if (isGameOver)
+        {
+            doneFlags[index] = true;
+            yield break;
+        }
+
         yield return StartCoroutine(routine);
         doneFlags[index] = true;
     }
 
-    // -----------------------------
-    // SlideBlocksCoroutine の同辺同時版
-    // -----------------------------
+    // Grouped SlideBlocksCoroutine: same edge entries run in parallel
     private IEnumerator SlideBlocksCoroutine(float duration)
     {
-        // group insertedBlocks by direction, but keep the edge order: Left -> Up -> Right -> Down
+        // group insertedBlocks by direction, keep edge order Left->Up->Right->Down
         var groups = new Dictionary<Direction, List<(int x, int y)>>()
         {
             { Direction.Left, new List<(int,int)>() },
@@ -264,63 +309,70 @@ public class BoardManager : MonoBehaviour
             else if (y == coreSize + 1) groups[Direction.Up].Add((x, y));
         }
 
-        // process edges in clockwise order starting from Left
         Direction[] order = new[] { Direction.Left, Direction.Up, Direction.Right, Direction.Down };
 
         foreach (var dir in order)
         {
-            var list = groups[dir];
-            if (list.Count == 0) continue;
+            if (isGameOver) yield break;
 
-            // For each entry in this edge, create a coroutine (SlideRowAnimated or SlideColumnAnimated)
-            var doneFlags = new List<bool>();
-            var started = new List<Coroutine>();
+            var list = groups[dir];
+            if (list == null || list.Count == 0) continue;
+
+            // prepare flags
+            var doneFlags = new List<bool>(new bool[list.Count]);
 
             for (int i = 0; i < list.Count; i++)
             {
-                doneFlags.Add(false);
-                var (x, y) = list[i];
+                if (isGameOver)
+                {
+                    doneFlags[i] = true;
+                    continue;
+                }
+
+                int localIndex = i; // avoid closure capture issues
+                var (x, y) = list[localIndex];
 
                 IEnumerator routine;
                 if (dir == Direction.Left || dir == Direction.Right)
                 {
-                    // row slide: y holds the row index
                     int row = y;
                     routine = SlideRowAnimated(row, dir, duration);
                 }
                 else
                 {
-                    // column slide: x holds the column index
                     int col = x;
                     routine = SlideColumnAnimated(col, dir, duration);
                 }
 
-                // start wrapper that will set doneFlags[i] = true when finished
-                started.Add(StartCoroutine(RunAndFlag(routine, doneFlags, i)));
+                StartCoroutine(RunAndFlag(routine, doneFlags, localIndex));
             }
 
             // wait until all doneFlags are true
-            bool allDone = false;
-            while (!allDone)
+            while (true)
             {
-                allDone = true;
+                if (isGameOver) break;
+
+                bool allDone = true;
                 for (int k = 0; k < doneFlags.Count; k++)
                 {
-                    if (!doneFlags[k]) { allDone = false; break; }
+                    if (!doneFlags[k])
+                    {
+                        allDone = false;
+                        break;
+                    }
                 }
-                if (!allDone) yield return null;
+                if (allDone) break;
+                yield return null;
             }
 
-            // small pause between edge groups for見た目 (optional)
+            // small gap for visual separation
             yield return new WaitForSeconds(0.03f);
         }
 
-        // 全部終了 -> Remove フェーズへ
+        // finished
         phase = GamePhase.Remove;
-
         yield break;
     }
-
 
     // ブロック（親オブジェクト）を滑らかに移動させるヘルパー
     private IEnumerator MoveTransformOverTime(Transform t, Vector3 from, Vector3 to, float duration)
@@ -328,24 +380,21 @@ public class BoardManager : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < duration)
         {
+            if (isGameOver) yield break;
             elapsed += Time.deltaTime;
             float t01 = Mathf.Clamp01(elapsed / duration);
-            // イージングにしたければ Mathf.SmoothStep(0,1,t01) 等
             t.position = Vector3.Lerp(from, to, t01);
             yield return null;
         }
         t.position = to;
     }
 
-    // 行アニメ + 配列更新
+    // SlideRowAnimated / SlideColumnAnimated: visual animation then array update
     private IEnumerator SlideRowAnimated(int row, Direction dir, float duration)
     {
-        // 1) collect movers (存在するブロックだけ)
         var movers = new List<(GameObject go, Vector3 from, Vector3 to)>();
-
         if (dir == Direction.Left)
         {
-            // 左が追加されるケース：各 x のブロックは x -> x+1 の位置に移動
             for (int x = 0; x < fullSize; x++)
             {
                 if (grid[x, row] != null)
@@ -356,9 +405,8 @@ public class BoardManager : MonoBehaviour
                 }
             }
         }
-        else // Right
+        else
         {
-            // 右が追加されるケース：各 x のブロックは x -> x-1 の位置に移動
             for (int x = 0; x < fullSize; x++)
             {
                 if (grid[x, row] != null)
@@ -370,16 +418,15 @@ public class BoardManager : MonoBehaviour
             }
         }
 
-        // 2) run animations in parallel
         var routines = new List<Coroutine>();
         foreach (var m in movers)
         {
+            if (isGameOver) yield break;
             routines.Add(StartCoroutine(MoveTransformOverTime(m.go.transform, m.from, m.to, duration)));
         }
-        // wait for all to finish
         foreach (var c in routines) yield return c;
 
-        // 3) array update (same logic as before), no transforms moved here (already positioned)
+        // array update
         if (dir == Direction.Left)
         {
             for (int x = fullSize - 1; x >= 1; x--)
@@ -388,19 +435,15 @@ public class BoardManager : MonoBehaviour
                 occupants[x, row] = occupants[x - 1, row];
                 gridData[x, row] = gridData[x - 1, row];
 
-                // playerXY 更新
-                if (gridData[x, row] == 3)
+                if (gridData[x, row] == PLAYER)
                 {
                     playerX = x;
                     playerY = row;
                 }
             }
-
-            grid[0, row] = null;
-            occupants[0, row] = null;
-            gridData[0, row] = 0;
+            grid[0, row] = null; occupants[0, row] = null; gridData[0, row] = 0;
         }
-        else // Right
+        else
         {
             for (int x = 0; x <= fullSize - 2; x++)
             {
@@ -408,35 +451,26 @@ public class BoardManager : MonoBehaviour
                 occupants[x, row] = occupants[x + 1, row];
                 gridData[x, row] = gridData[x + 1, row];
 
-                if (gridData[x, row] == 3)
+                if (gridData[x, row] == PLAYER)
                 {
                     playerX = x;
                     playerY = row;
                 }
             }
-
-            grid[fullSize - 1, row] = null;
-            occupants[fullSize - 1, row] = null;
-            gridData[fullSize - 1, row] = 0;
+            grid[fullSize - 1, row] = null; occupants[fullSize - 1, row] = null; gridData[fullSize - 1, row] = 0;
         }
 
-        // update playerObj reference
         if (playerX >= 0 && playerY >= 0 && playerX < fullSize && playerY < fullSize)
-        {
             playerObj = occupants[playerX, playerY];
-        }
 
         yield break;
     }
 
-    // 列アニメ + 配列更新
     private IEnumerator SlideColumnAnimated(int col, Direction dir, float duration)
     {
         var movers = new List<(GameObject go, Vector3 from, Vector3 to)>();
-
         if (dir == Direction.Up)
         {
-            // 上から追加 -> 下へ移動（y -> y-1）
             for (int y = 0; y < fullSize; y++)
             {
                 if (grid[col, y] != null)
@@ -447,9 +481,8 @@ public class BoardManager : MonoBehaviour
                 }
             }
         }
-        else // Down
+        else
         {
-            // 下から追加 -> 上へ移動 (y -> y+1)
             for (int y = 0; y < fullSize; y++)
             {
                 if (grid[col, y] != null)
@@ -464,11 +497,11 @@ public class BoardManager : MonoBehaviour
         var routines = new List<Coroutine>();
         foreach (var m in movers)
         {
+            if (isGameOver) yield break;
             routines.Add(StartCoroutine(MoveTransformOverTime(m.go.transform, m.from, m.to, duration)));
         }
         foreach (var c in routines) yield return c;
 
-        // 配列更新
         if (dir == Direction.Up)
         {
             for (int y = 1; y <= fullSize - 1; y++)
@@ -477,15 +510,13 @@ public class BoardManager : MonoBehaviour
                 occupants[col, y - 1] = occupants[col, y];
                 gridData[col, y - 1] = gridData[col, y];
 
-                if (gridData[col, y - 1] == 3)
+                if (gridData[col, y - 1] == PLAYER)
                 {
                     playerX = col;
                     playerY = y - 1;
                 }
             }
-            grid[col, fullSize - 1] = null;
-            occupants[col, fullSize - 1] = null;
-            gridData[col, fullSize - 1] = 0;
+            grid[col, fullSize - 1] = null; occupants[col, fullSize - 1] = null; gridData[col, fullSize - 1] = 0;
         }
         else
         {
@@ -495,59 +526,55 @@ public class BoardManager : MonoBehaviour
                 occupants[col, y + 1] = occupants[col, y];
                 gridData[col, y + 1] = gridData[col, y];
 
-                if (gridData[col, y + 1] == 3)
+                if (gridData[col, y + 1] == PLAYER)
                 {
                     playerX = col;
                     playerY = y + 1;
                 }
             }
-            grid[col, 0] = null;
-            occupants[col, 0] = null;
-            gridData[col, 0] = 0;
+            grid[col, 0] = null; occupants[col, 0] = null; grid[col, 0] = null; gridData[col, 0] = 0;
         }
 
-        // update playerObj reference
         if (playerX >= 0 && playerY >= 0 && playerX < fullSize && playerY < fullSize)
-        {
             playerObj = occupants[playerX, playerY];
-        }
 
         yield break;
     }
 
-    // -----------------------------
-    // 削除（押し出されたものを消す）
-    // -----------------------------
+    // ---------------- 攻撃 ----------------
+    void PerformAttackAtLastPosition()
+    {
+        Debug.Log($"Attack at ({lastPlayerX},{lastPlayerY})");
+        if (playerX == lastPlayerX && playerY == lastPlayerY)
+        {
+            Debug.Log("Player hit by attack! Game Over.");
+            GameOver();
+        }
+    }
+
+    // ---------------- 削除 ----------------
     void RemoveBlocks()
     {
         foreach (var (x, y) in insertedBlocks)
         {
-            if (x == 0)
-            {
-                int tx = fullSize - 1, ty = y;
-                DestroyAt(tx, ty);
-            }
-            else if (x == coreSize + 1)
-            {
-                int tx = 0, ty = y;
-                DestroyAt(tx, ty);
-            }
-            else if (y == 0)
-            {
-                int tx = x, ty = fullSize - 1;
-                DestroyAt(tx, ty);
-            }
-            else if (y == coreSize + 1)
-            {
-                int tx = x, ty = 0;
-                DestroyAt(tx, ty);
-            }
+            if (isGameOver) break;
+
+            if (x == 0) { int tx = fullSize - 1, ty = y; DestroyAt(tx, ty); }
+            else if (x == coreSize + 1) { int tx = 0, ty = y; DestroyAt(tx, ty); }
+            else if (y == 0) { int tx = x, ty = fullSize - 1; DestroyAt(tx, ty); }
+            else if (y == coreSize + 1) { int tx = x, ty = 0; DestroyAt(tx, ty); }
         }
         insertedBlocks.Clear();
     }
 
     void DestroyAt(int x, int y)
     {
+        if (occupants[x, y] != null && occupants[x, y] == playerObj)
+        {
+            Debug.Log("Player pushed out of board! Game Over.");
+            GameOver();
+        }
+
         if (grid[x, y] != null) Destroy(grid[x, y]);
         if (occupants[x, y] != null) Destroy(occupants[x, y]);
         grid[x, y] = null;
@@ -555,9 +582,14 @@ public class BoardManager : MonoBehaviour
         gridData[x, y] = 0;
     }
 
-    // -----------------------------
-    // 生成 / 消去 / 移動ユーティリティ
-    // -----------------------------
+    void GameOver()
+    {
+        isGameOver = true;
+        phase = GamePhase.Add;
+        Debug.Log("=== GAME OVER ===");
+    }
+
+    // ---------------- 生成 / 取得 / 移動 ----------------
     public void PlaceObjectOnBlock(int x, int y)
     {
         if (grid[x, y] == null) return;
@@ -568,26 +600,38 @@ public class BoardManager : MonoBehaviour
             occupants[x, y] = null;
         }
 
-        if (gridData[x, y] == 1)
-            occupants[x, y] = Instantiate(itemPrefab, grid[x, y].transform.position + Vector3.up * 0.5f, Quaternion.identity, grid[x, y].transform);
-        else if (gridData[x, y] == 2)
+        int cell = gridData[x, y];
+        if (cell == 0) return;
+
+        if (cell == OBSTACLE)
+        {
             occupants[x, y] = Instantiate(obstaclePrefab, grid[x, y].transform.position + Vector3.up * 0.5f, Quaternion.identity, grid[x, y].transform);
-        else if (gridData[x, y] == 3)
+        }
+        else if (cell == PLAYER)
+        {
             occupants[x, y] = Instantiate(playerPrefab, grid[x, y].transform.position + Vector3.up * 0.5f, Quaternion.identity, grid[x, y].transform);
+        }
+        else if (cell == ITEM_A || cell == ITEM_B || cell == ITEM_C)
+        {
+            int idx = (cell == ITEM_A) ? 0 : (cell == ITEM_B) ? 1 : 2;
+            if (itemPrefabs != null && itemPrefabs.Length > idx && itemPrefabs[idx] != null)
+                occupants[x, y] = Instantiate(itemPrefabs[idx], grid[x, y].transform.position + Vector3.up * 0.5f, Quaternion.identity, grid[x, y].transform);
+            else
+                Debug.LogWarning($"itemPrefabs[{idx}] not set");
+        }
     }
 
     public void ConsumeItemAt(int x, int y)
     {
-        if (gridData[x, y] != 1) return;
-        if (occupants[x, y] != null)
-        {
-            Destroy(occupants[x, y]);
-            occupants[x, y] = null;
-        }
+        int cell = gridData[x, y];
+        if (!(cell == ITEM_A || cell == ITEM_B || cell == ITEM_C)) return;
+
+        int idx = (cell == ITEM_A) ? 0 : (cell == ITEM_B) ? 1 : 2;
+        itemsCount[idx]++;
+        if (occupants[x, y] != null) { Destroy(occupants[x, y]); occupants[x, y] = null; }
         gridData[x, y] = 0;
     }
 
-    // 注意: playerGO は通常 playerObj を渡す
     public void MovePlayerTo(int oldX, int oldY, int newX, int newY, GameObject playerGO)
     {
         if (occupants[newX, newY] != null && occupants[newX, newY] != playerGO)
@@ -599,19 +643,32 @@ public class BoardManager : MonoBehaviour
         if (occupants[oldX, oldY] == playerGO) occupants[oldX, oldY] = null;
 
         gridData[oldX, oldY] = 0;
-        gridData[newX, newY] = 3;
+        gridData[newX, newY] = PLAYER;
 
         occupants[newX, newY] = playerGO;
         playerGO.transform.SetParent(grid[newX, newY].transform);
         playerGO.transform.localPosition = Vector3.up * 0.5f;
 
-        // playerObj を最新に
         playerObj = playerGO;
     }
 
-    // -----------------------------
-    // ユーティリティ
-    // -----------------------------
+    // ---------------- アイテム使用 ----------------
+    void UseItem(int index)
+    {
+        if (index < 0 || index >= itemsCount.Length) return;
+        if (itemsCount[index] <= 0)
+        {
+            Debug.Log($"No item {index + 1} to use.");
+            return;
+        }
+
+        itemsCount[index]--;
+        Debug.Log($"Used item {index + 1}. Remaining: {itemsCount[index]}");
+
+        // TODO: 実際の効果をここに実装（例：前方の障害物破壊 / 攻撃無効化 / スコア倍率など）
+    }
+
+    // ---------------- ヘルパー ----------------
     void Shuffle(List<int> list)
     {
         for (int i = 0; i < list.Count; i++)
@@ -619,5 +676,21 @@ public class BoardManager : MonoBehaviour
             int j = Random.Range(i, list.Count);
             (list[i], list[j]) = (list[j], list[i]);
         }
+    }
+
+    // 出現確率に従ってセル値を生成
+    int GenerateCellValueByProbability()
+    {
+        float obstacleProb = obstacleBaseProb + (level - 1) * obstacleIncreasePerLevel;
+        obstacleProb = Mathf.Clamp01(obstacleProb);
+
+        float itemTotal = itemProbEach * 3f;
+        float r = Random.value;
+
+        if (r < itemProbEach) return ITEM_A;
+        if (r < itemProbEach * 2f) return ITEM_B;
+        if (r < itemProbEach * 3f) return ITEM_C;
+        if (r < itemProbEach * 3f + obstacleProb) return OBSTACLE;
+        return 0;
     }
 }
