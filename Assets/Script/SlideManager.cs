@@ -19,6 +19,7 @@ public class SlideManager : MonoBehaviour, ISlideManager
         if (gridStorage == null) Debug.LogError("[SlideManager] gridStorage not assigned!");
     }
 
+    // スライド実行
     public IEnumerator SlideInsertedBlocksCoroutine(List<(int x, int y)> insertedBlocks, float duration, Action<SlideResult> onComplete = null)
     {
         var result = new SlideResult();
@@ -34,11 +35,10 @@ public class SlideManager : MonoBehaviour, ISlideManager
         var occupants = gridStorage.Occupants;
         var gridData = gridStorage.GridData;
 
-        // snapshot before
         int[,] before = new int[fullSize, fullSize];
         for (int x = 0; x < fullSize; x++) for (int y = 0; y < fullSize; y++) before[x, y] = gridData[x, y];
 
-        var groups = new Dictionary<Direction, List<(int x,int y)>>()
+        var groups = new Dictionary<Direction, List<(int x, int y)>>()
         {
             { Direction.Left, new List<(int,int)>() },
             { Direction.Up, new List<(int,int)>() },
@@ -46,16 +46,18 @@ public class SlideManager : MonoBehaviour, ISlideManager
             { Direction.Down, new List<(int,int)>() }
         };
 
-        foreach (var (x,y) in insertedBlocks)
+        // 追加ブロック振り分け
+        foreach (var (x, y) in insertedBlocks)
         {
-            if (x == 0) groups[Direction.Left].Add((x,y));
-            else if (x == coreSize + 1) groups[Direction.Right].Add((x,y));
-            else if (y == 0) groups[Direction.Down].Add((x,y));
-            else if (y == coreSize + 1) groups[Direction.Up].Add((x,y));
+            if (x == 0) groups[Direction.Left].Add((x, y));
+            else if (x == coreSize + 1) groups[Direction.Right].Add((x, y));
+            else if (y == 0) groups[Direction.Down].Add((x, y));
+            else if (y == coreSize + 1) groups[Direction.Up].Add((x, y));
         }
 
         Direction[] order = new[] { Direction.Left, Direction.Up, Direction.Right, Direction.Down };
 
+        // スライドアニメーション呼び出し
         foreach (var dir in order)
         {
             if (gridStorage == null) { result.Success = false; onComplete?.Invoke(result); yield break; }
@@ -67,20 +69,17 @@ public class SlideManager : MonoBehaviour, ISlideManager
             for (int i = 0; i < list.Count; i++)
             {
                 if (gridStorage == null) { doneFlags[i] = true; continue; }
-                int localIndex = i;
-                var (x,y) = list[localIndex];
+                var (x, y) = list[i];
                 IEnumerator routine;
                 if (dir == Direction.Left || dir == Direction.Right)
                 {
-                    int row = y;
-                    routine = SlideRowAnimated(row, dir, duration);
+                    routine = SlideRowAnimated(y, dir, duration);
                 }
                 else
                 {
-                    int col = x;
-                    routine = SlideColumnAnimated(col, dir, duration);
+                    routine = SlideColumnAnimated(x, dir, duration);
                 }
-                StartCoroutine(RunAndFlag(routine, doneFlags, localIndex));
+                StartCoroutine(RunAndFlag(routine, doneFlags, i));
             }
 
             while (true)
@@ -94,32 +93,29 @@ public class SlideManager : MonoBehaviour, ISlideManager
             yield return new WaitForSeconds(0.03f);
         }
 
-        // snapshot after
         int[,] after = new int[fullSize, fullSize];
         for (int x = 0; x < fullSize; x++) for (int y = 0; y < fullSize; y++) after[x, y] = gridData[x, y];
 
-        // build change list
         for (int x = 0; x < fullSize; x++)
         {
             for (int y = 0; y < fullSize; y++)
             {
-                if (before[x,y] != after[x,y])
+                if (before[x, y] != after[x, y])
                 {
-                    result.Changes.Add(new CellChange(new Vector2Int(x,y), after[x,y]));
+                    result.Changes.Add(new CellChange(new Vector2Int(x, y), after[x, y]));
                 }
             }
         }
 
-        // find PLAYER pos
-        int px=-1, py=-1;
+        // プレイヤー検出
+        int px = -1, py = -1;
         for (int x = 0; x < fullSize; x++)
         {
             for (int y = 0; y < fullSize; y++)
             {
-                if (gridData[x,y] == boardManager.PLAYER)
+                if (gridData[x, y] == boardManager.PLAYER)
                 {
                     px = x; py = y;
-                    // don't break: prefer last found in case duplicates (shouldn't happen)
                 }
             }
         }
@@ -129,12 +125,136 @@ public class SlideManager : MonoBehaviour, ISlideManager
         yield break;
     }
 
+    // 完了フラグセット
     private IEnumerator RunAndFlag(IEnumerator routine, List<bool> doneFlags, int index)
     {
         yield return StartCoroutine(routine);
         doneFlags[index] = true;
     }
 
+    // 行スライドアニメーション
+    private IEnumerator SlideRowAnimated(int row, Direction dir, float duration)
+    {
+        var grid = gridStorage.GridObjects;
+        var occupants = gridStorage.Occupants;
+        var gridData = gridStorage.GridData;
+
+        var movers = new List<(GameObject go, Vector3 from, Vector3 to)>();
+        if (dir == Direction.Left)
+        {
+            for (int x = 0; x < fullSize; x++)
+            {
+                if (grid[x, row] != null)
+                {
+                    Vector3 from = grid[x, row].transform.position;
+                    Vector3 to = gridStorage.WorldPosition(x + 1, row);
+                    movers.Add((grid[x, row], from, to));
+                }
+            }
+        }
+        else // Right
+        {
+            for (int x = 0; x < fullSize; x++)
+            {
+                if (grid[x, row] != null)
+                {
+                    Vector3 from = grid[x, row].transform.position;
+                    Vector3 to = gridStorage.WorldPosition(x - 1, row);
+                    movers.Add((grid[x, row], from, to));
+                }
+            }
+        }
+
+        var routines = new List<Coroutine>();
+        foreach (var m in movers) routines.Add(StartCoroutine(MoveTransformOverTime(m.go.transform, m.from, m.to, duration)));
+        foreach (var c in routines) yield return c;
+
+        if (dir == Direction.Left)
+        {
+            for (int x = fullSize - 1; x >= 1; x--)
+            {
+                grid[x, row] = grid[x - 1, row];
+                occupants[x, row] = occupants[x - 1, row];
+                gridData[x, row] = gridData[x - 1, row];
+            }
+            grid[0, row] = null; occupants[0, row] = null; gridData[0, row] = 0;
+        }
+        else // Right
+        {
+            for (int x = 0; x <= fullSize - 2; x++)
+            {
+                grid[x, row] = grid[x + 1, row];
+                occupants[x, row] = occupants[x + 1, row];
+                gridData[x, row] = gridData[x + 1, row];
+            }
+            grid[fullSize - 1, row] = null; occupants[fullSize - 1, row] = null; gridData[fullSize - 1, row] = 0;
+        }
+
+        yield break;
+    }
+
+    // 列スライドアニメーション
+    private IEnumerator SlideColumnAnimated(int col, Direction dir, float duration)
+    {
+        var grid = gridStorage.GridObjects;
+        var occupants = gridStorage.Occupants;
+        var gridData = gridStorage.GridData;
+
+        var movers = new List<(GameObject go, Vector3 from, Vector3 to)>();
+        if (dir == Direction.Up)
+        {
+            for (int y = 0; y < fullSize; y++)
+            {
+                if (grid[col, y] != null)
+                {
+                    Vector3 from = grid[col, y].transform.position;
+                    Vector3 to = gridStorage.WorldPosition(col, y - 1);
+                    movers.Add((grid[col, y], from, to));
+                }
+            }
+        }
+        else // Down
+        {
+            for (int y = 0; y < fullSize; y++)
+            {
+                if (grid[col, y] != null)
+                {
+                    Vector3 from = grid[col, y].transform.position;
+                    Vector3 to = gridStorage.WorldPosition(col, y + 1);
+                    movers.Add((grid[col, y], from, to));
+                }
+            }
+        }
+
+        var routines = new List<Coroutine>();
+        foreach (var m in movers) routines.Add(StartCoroutine(MoveTransformOverTime(m.go.transform, m.from, m.to, duration)));
+        foreach (var c in routines) yield return c;
+
+        if (dir == Direction.Up)
+        {
+            for (int y = 1; y <= fullSize - 1; y++)
+            {
+                grid[col, y - 1] = grid[col, y];
+                occupants[col, y - 1] = occupants[col, y];
+                gridData[col, y - 1] = gridData[col, y];
+            }
+            grid[col, fullSize - 1] = null; occupants[col, fullSize - 1] = null; gridData[col, fullSize - 1] = 0;
+        }
+        else // Down
+        {
+            for (int y = fullSize - 2; y >= 0; y--)
+            {
+                grid[col, y + 1] = grid[col, y];
+                occupants[col, y + 1] = occupants[col, y];
+                gridData[col, y + 1] = gridData[col, y];
+            }
+            grid[col, 0] = null; occupants[col, 0] = null; gridData[col, 0] = 0;
+        }
+
+        yield break;
+    }
+    
+    // スライドアニメーション処理
     private IEnumerator MoveTransformOverTime(Transform t, Vector3 from, Vector3 to, float duration)
     {
         float elapsed = 0f;
@@ -148,123 +268,4 @@ public class SlideManager : MonoBehaviour, ISlideManager
         t.position = to;
     }
 
-    private IEnumerator SlideRowAnimated(int row, Direction dir, float duration)
-    {
-        var grid = gridStorage.GridObjects;
-        var occupants = gridStorage.Occupants;
-        var gridData = gridStorage.GridData;
-
-        var movers = new List<(GameObject go, Vector3 from, Vector3 to)>();
-        if (dir == Direction.Left)
-        {
-            for (int x = 0; x < fullSize; x++)
-            {
-                if (grid[x,row] != null)
-                {
-                    Vector3 from = grid[x,row].transform.position;
-                    Vector3 to = gridStorage.WorldPosition(x+1, row);
-                    movers.Add((grid[x,row], from, to));
-                }
-            }
-        }
-        else // Right
-        {
-            for (int x = 0; x < fullSize; x++)
-            {
-                if (grid[x,row] != null)
-                {
-                    Vector3 from = grid[x,row].transform.position;
-                    Vector3 to = gridStorage.WorldPosition(x-1, row);
-                    movers.Add((grid[x,row], from, to));
-                }
-            }
-        }
-
-        var routines = new List<Coroutine>();
-        foreach (var m in movers) routines.Add(StartCoroutine(MoveTransformOverTime(m.go.transform, m.from, m.to, duration)));
-        foreach (var c in routines) yield return c;
-
-        if (dir == Direction.Left)
-        {
-            for (int x = fullSize - 1; x >= 1; x--)
-            {
-                grid[x,row] = grid[x-1,row];
-                occupants[x,row] = occupants[x-1,row];
-                gridData[x,row] = gridData[x-1,row];
-            }
-            grid[0,row] = null; occupants[0,row] = null; gridData[0,row] = 0;
-        }
-        else // Right
-        {
-            for (int x = 0; x <= fullSize - 2; x++)
-            {
-                grid[x,row] = grid[x+1,row];
-                occupants[x,row] = occupants[x+1,row];
-                gridData[x,row] = gridData[x+1,row];
-            }
-            grid[fullSize-1,row] = null; occupants[fullSize-1,row] = null; gridData[fullSize-1,row] = 0;
-        }
-
-        yield break;
-    }
-
-    private IEnumerator SlideColumnAnimated(int col, Direction dir, float duration)
-    {
-        var grid = gridStorage.GridObjects;
-        var occupants = gridStorage.Occupants;
-        var gridData = gridStorage.GridData;
-
-        var movers = new List<(GameObject go, Vector3 from, Vector3 to)>();
-        if (dir == Direction.Up)
-        {
-            for (int y = 0; y < fullSize; y++)
-            {
-                if (grid[col,y] != null)
-                {
-                    Vector3 from = grid[col,y].transform.position;
-                    Vector3 to = gridStorage.WorldPosition(col, y-1);
-                    movers.Add((grid[col,y], from, to));
-                }
-            }
-        }
-        else // Down
-        {
-            for (int y = 0; y < fullSize; y++)
-            {
-                if (grid[col,y] != null)
-                {
-                    Vector3 from = grid[col,y].transform.position;
-                    Vector3 to = gridStorage.WorldPosition(col, y+1);
-                    movers.Add((grid[col,y], from, to));
-                }
-            }
-        }
-
-        var routines = new List<Coroutine>();
-        foreach (var m in movers) routines.Add(StartCoroutine(MoveTransformOverTime(m.go.transform, m.from, m.to, duration)));
-        foreach (var c in routines) yield return c;
-
-        if (dir == Direction.Up)
-        {
-            for (int y = 1; y <= fullSize - 1; y++)
-            {
-                grid[col,y-1] = grid[col,y];
-                occupants[col,y-1] = occupants[col,y];
-                gridData[col,y-1] = gridData[col,y];
-            }
-            grid[col,fullSize-1] = null; occupants[col,fullSize-1] = null; gridData[col,fullSize-1] = 0;
-        }
-        else // Down
-        {
-            for (int y = fullSize - 2; y >= 0; y--)
-            {
-                grid[col,y+1] = grid[col,y];
-                occupants[col,y+1] = occupants[col,y];
-                gridData[col,y+1] = gridData[col,y];
-            }
-            grid[col,0] = null; occupants[col,0] = null; gridData[col,0] = 0;
-        }
-
-        yield break;
-    }
 }

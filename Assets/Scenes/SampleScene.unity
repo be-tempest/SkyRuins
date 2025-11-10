@@ -553,12 +553,6 @@ MonoBehaviour:
   slideManagerBehaviour: {fileID: 89392641}
   deleteManagerBehaviour: {fileID: 1348411810}
   itemManagerBehaviour: {fileID: 1081705758}
-  PLAYER: 1
-  OBSTACLE: 2
-  ITEM_A: 3
-  ITEM_B: 4
-  ITEM_C: 5
-  slideDuration: 0.4
   itemProbEach: 0.05
   obstacleBaseProb: 0.2
   obstacleIncreasePerLevel: 0.02
@@ -733,8 +727,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3611cf0aeade87e40835c760c7361deb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  coreSize: 7
-  fullSize: 9
+  FullSize: 9
+  CoreSize: 7
 --- !u!4 &1124283396
 Transform:
   m_ObjectHideFlags: 0
@@ -885,6 +879,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b1081fc30a74e5438d56a1372358309, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  itemManager: {fileID: 1081705758}
 --- !u!1 &1806116270
 GameObject:
   m_ObjectHideFlags: 0
@@ -914,6 +909,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b27c1f1640af34b4eb34cf3ad73ea1ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  boardManager: {fileID: 573128384}
+  gridStorage: {fileID: 1124283395}
   blockPrefab: {fileID: 6274024535626205747, guid: cae70bd883d3ddf46b2253a4dd51cdff, type: 3}
   obstaclePrefab: {fileID: 6063914497438659130, guid: 11b15568ff0a69a49bd53e391c6dc8ac, type: 3}
   playerPrefab: {fileID: 4849806820580639334, guid: c6b8acf0bfb52654f927e0f0bc542441, type: 3}
@@ -921,7 +918,6 @@ MonoBehaviour:
   - {fileID: 6966280250260886191, guid: a73ee2eec565eb943b41835ef3db7eee, type: 3}
   - {fileID: 6966280250260886191, guid: db2e8079755654d4d9d318b953c0c290, type: 3}
   - {fileID: 6966280250260886191, guid: 1de79946c65c693478335acb7f2cdc14, type: 3}
-  gridStorage: {fileID: 1124283395}
 --- !u!4 &1806116272
 Transform:
   m_ObjectHideFlags: 0

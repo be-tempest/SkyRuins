@@ -1,59 +1,41 @@
-// GridStorage.cs
 using UnityEngine;
 
-/// <summary>
-/// Grid / Occupants / GridData を一元管理するコンポーネント。
-/// BoardManager などから参照して使います。
-/// Attach this script to an empty GameObject in the Scene and set coreSize/fullSize there,
-/// or leave defaults (coreSize=7, fullSize=9).
-/// </summary>
 public class GridStorage : MonoBehaviour, IGridStorage
 {
-    [Header("Grid Size (coreSize = playable area width)")]
-    [Tooltip("coreSize: playable core (例: 7)。fullSize は外枠を含む (例: 9)。")]
-    public int coreSize = 7;
+    // 盤面サイズ
+    public int FullSize = 9;
+    public int CoreSize = 7;
 
-    // fullSize は coreSize + 2 (左右外枠/上下外枠)
-    public int FullSize => fullSize;
-    public int CoreSize => coreSize;
-
-    [SerializeField]
-    private int fullSize = 9; // デフォルトは coreSize + 2。Awake で整合チェックします。
-
-    // データ配列
+    // 盤面データ配列
     public GameObject[,] GridObjects { get; set; }
     public GameObject[,] Occupants { get; set; }
     public int[,] GridData { get; set; }
 
     void Awake()
     {
-        // 整合性: coreSize に合わせて fullSize を自動セット（もし不整合があれば修正）
-        int expected = coreSize + 2;
-        if (fullSize != expected)
+        int expected = CoreSize + 2;
+        if (FullSize != expected)
         {
-            fullSize = expected;
-            Debug.Log($"[GridStorage] fullSize adjusted to coreSize + 2 = {fullSize}");
+            FullSize = expected;
+            Debug.Log($"[GridStorage] fullSize adjusted to coreSize + 2 = {FullSize}");
         }
 
-        GridObjects = new GameObject[fullSize, fullSize];
-        Occupants = new GameObject[fullSize, fullSize];
-        GridData = new int[fullSize, fullSize];
+        GridObjects = new GameObject[FullSize, FullSize];
+        Occupants = new GameObject[FullSize, FullSize];
+        GridData = new int[FullSize, FullSize];
     }
 
-    // index 範囲チェック（0..fullSize-1）
+    // 範囲チェック
     public bool IsValidIndex(int x, int y)
     {
-        return x >= 0 && y >= 0 && x < fullSize && y < fullSize;
+        return x >= 0 && y >= 0 && x < FullSize && y < FullSize;
     }
 
-    // core 内（1..coreSize）
     public bool IsInsideCore(int x, int y)
     {
-        return x >= 1 && y >= 1 && x <= coreSize && y <= coreSize;
+        return x >= 1 && y >= 1 && x <= CoreSize && y <= CoreSize;
     }
 
-    // ワールド座標変換（グリッドインデックス -> ワールド）
-    // ここは既存の座標系に合わせているので、必要なら修正してください。
     public Vector3 WorldPosition(int x, int y)
     {
         return new Vector3(x, 0f, y);
@@ -64,7 +46,6 @@ public class GridStorage : MonoBehaviour, IGridStorage
         if (!IsValidIndex(x, y)) return;
         GridData[x, y] = value;
         Occupants[x, y] = obj;
-        // GridObjects は床 (block) など別管理で SpawnBlock がセットする想定
     }
 
     public int GetCell(int x, int y)

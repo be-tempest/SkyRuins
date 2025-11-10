@@ -3,8 +3,8 @@ using UnityEngine;
 
 public interface IGridStorage
 {
-    int FullSize { get; }
-    int CoreSize { get; }
+    //int FullSize { get; }
+    //int CoreSize { get; }
 
     GameObject[,] GridObjects { get; }
     GameObject[,] Occupants { get; }

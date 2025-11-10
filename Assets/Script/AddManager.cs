@@ -1,20 +1,12 @@
-// AddManager.cs
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Add（外枠ブロック追加）のロジックを切り出したコンポーネント。
-/// - BoardManager3 から addCount を受け取り、追加する外枠ブロックの座標リストを返す。
-/// - 実際に Block を Spawn し、GridStorage.GridObjects を更新する（gridData は BoardManager が決める）。
-/// - BoardManager3.Direction を参照しているので BoardManager3 の Direction を public にしてください。
-/// </summary>
 public class AddManager : MonoBehaviour
 {
-    [Header("References (assign same instances as BoardManager)")]
-    public GridStorage gridStorage;   // 必須
-    public BoardSpawner boardSpawner; // 必須
+    public GridStorage gridStorage;
+    public BoardSpawner boardSpawner;
 
     private int coreSize => gridStorage != null ? gridStorage.CoreSize : 7;
     private int fullSize => gridStorage != null ? gridStorage.FullSize : 9;
@@ -25,24 +17,19 @@ public class AddManager : MonoBehaviour
         if (boardSpawner == null) Debug.LogError("[AddManager] boardSpawner not assigned!");
     }
 
-    /// <summary>
-    /// addCount: BoardManager3.Direction => count の辞書
-    /// 戻り値: 追加された外枠ブロック座標のリスト (x,y)
-    /// 副作用: boardSpawner.SpawnBlockAt(x,y) を呼んで GridObjects に実オブジェクトを配置する
-    /// </summary>
+    // 追加ブロック決定
     public List<(int x, int y)> AddBlocks(Dictionary<BoardManager3.Direction, int> addCount)
     {
         var inserted = new List<(int, int)>();
         if (gridStorage == null || boardSpawner == null)
         {
-            Debug.LogError("[AddManager] Missing references - cannot AddBlocks.");
+            Debug.LogError("[AddManager] Missing references.");
             return inserted;
         }
 
         var usedRows = new HashSet<int>();
         var usedCols = new HashSet<int>();
 
-        // directions の順番は BoardManager と合わせる（Left, Up, Right, Down）
         var dirs = new BoardManager3.Direction[] {
             BoardManager3.Direction.Left,
             BoardManager3.Direction.Up,
@@ -56,7 +43,7 @@ public class AddManager : MonoBehaviour
             if (addCount != null && addCount.ContainsKey(dir)) count = addCount[dir];
             if (count == 0) continue;
 
-            // 候補は 1..coreSize
+            // 追加位置抽選
             var candidates = new List<int>();
             for (int i = 1; i <= coreSize; i++) candidates.Add(i);
             Shuffle(candidates);
@@ -84,15 +71,7 @@ public class AddManager : MonoBehaviour
                     case BoardManager3.Direction.Down: x = idx; y = 0; break;
                 }
 
-                // Spawn block at border and ensure GridStorage reflects it.
-                // Assumes boardSpawner.SpawnBlockAt will create the GameObject and parent it appropriately.
                 boardSpawner.SpawnBlockAt(x, y);
-
-                // If boardSpawner does not itself set GridStorage.GridObjects, set it here defensively:
-                // (SpawnBlockAt in your project previously populated gridStorage.GridObjects;
-                //  if not, uncomment the following line and adjust to returned GameObject.)
-                // gridStorage.GridObjects[x, y] = theSpawnedBlock; 
-
                 inserted.Add((x, y));
                 added++;
                 if (added >= count) break;
