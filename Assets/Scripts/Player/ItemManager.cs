@@ -1,11 +1,10 @@
 using UnityEngine;
-using Data;
 
 namespace Player
 {
     public class ItemManager : MonoBehaviour
     {
-        [SerializeField] private BoardData boardData;
+        [SerializeField] private Board.BoardData boardData;
         [SerializeField] private PlayerData playerData;
 
         public bool UseBomb(int perX, int perY)
@@ -25,7 +24,7 @@ namespace Player
 
         public void UseShild()
         {
-            playerData.SetShild(true);
+            // playerData.SetShild(true);
         }
 
         public void UseBoots()

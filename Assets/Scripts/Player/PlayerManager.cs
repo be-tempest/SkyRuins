@@ -11,46 +11,30 @@ namespace Player
         private Action end;
         private Action over;
 
-        public enum CommandState
-        {
-            None,
-            MainSelect,
-            MoveSelect,
-            ItemSelect,
-            ItemUse
-        }
-
-        [SerializeField] private GameObject mainPanel;
-        [SerializeField] private CommandUIGroup mainUI;
-
-        [SerializeField] private GameObject itemPanel;
-        [SerializeField] private CommandUIGroup itemUI;
-
+        [SerializeField] private InputManager inputManager;
         [SerializeField] private MoveManager moveManager;
+        [SerializeField] private AttackManager attackManager;
         [SerializeField] private ItemManager itemManager;
 
-        private CommandState currentState = CommandState.None;
-
-        void Update()
+        [System.Serializable]
+        public struct CommandStruct
         {
-            switch (currentState)
-            {
-                case CommandState.MainSelect:
-                    MainSelectPanel();
-                    break;
+            public CommandState commandState;
+            public CommandUI commandUI;
+            public GameObject commandPanel;
+        }
 
-                case CommandState.MoveSelect:
-                    MoveSelect();
-                    break;
+        [SerializeField] private CommandStruct[] commands;
 
-                case CommandState.ItemSelect:
-                    ItemSelectPanel();
-                    break;
+        private CommandState currentState = CommandState.None;
+        private CommandUI currentUI = null;
 
-                case CommandState.ItemUse:
-                    UseItem();
-                    break;
-            }
+        private bool isMoving = false;
+
+        public void InitPlayer()
+        {
+            moveManager.SetAnimation();
+            attackManager.SetAnimation();
         }
 
         public void StartPlayerTurn(Action turnEnd, Action gameOver)
@@ -74,131 +58,267 @@ namespace Player
             end?.Invoke();
         }
 
-        void ChangeState(CommandState newState)
+        void Update()
         {
-            currentState = newState;
-
             switch (currentState)
             {
                 case CommandState.MainSelect:
-                    mainPanel.SetActive(true);
-                    itemPanel.SetActive(false);
+                    MainSelect();
                     break;
 
                 case CommandState.MoveSelect:
-                    mainPanel.SetActive(false);
-                    itemPanel.SetActive(false);
+                    MoveSelect();
+                    break;
+
+                case CommandState.AttackSelect:
+                    AttackSelect();
+                    break;
+
+                case CommandState.MagicSelect:
                     break;
 
                 case CommandState.ItemSelect:
-                    mainPanel.SetActive(false);
-                    itemPanel.SetActive(true);
+                    ItemSelect();
                     break;
 
-                case CommandState.None:
-                    mainPanel.SetActive(false);
-                    itemPanel.SetActive(false);
+                case CommandState.ItemUse:
                     break;
             }
         }
 
-        void MainSelectPanel()
+        void ChangeState(CommandState newState)
         {
-            if (Input.GetKeyDown(KeyCode.UpArrow)) mainUI.MoveUp();
-            if (Input.GetKeyDown(KeyCode.DownArrow)) mainUI.MoveDown();
+            OnExitState(currentState);
 
-            if (Input.GetKeyDown(KeyCode.Z))
+            currentState = newState;
+
+            // 対応するUIだけON
+            foreach (var command in commands)
             {
-                if (mainUI.index == 0)
+                if (command.commandState == currentState)
                 {
+                    command.commandPanel.SetActive(true);
+                    currentUI = command.commandUI;
+                }
+                else
+                {
+                    command.commandPanel.SetActive(false);
+                }
+            }
+
+            currentUI.Refresh(currentState);
+            OnEnterState(currentState);
+        }
+
+        void OnEnterState(CommandState state)
+        {
+            switch (state)
+            {
+                case CommandState.MoveSelect:
+                    moveManager.ShowMoveGuide();
+                    break;
+            }
+        }
+
+        void OnExitState(CommandState state)
+        {
+            switch (state)
+            {
+                case CommandState.MoveSelect:
+                    moveManager.Clear();
+                    break;
+                case CommandState.AttackSelect:
+                    attackManager.Clear(); 
+                    break;
+            }
+        }
+
+        void MainSelect()
+        {
+            var input = inputManager.GetInput();
+            bool decided = currentUI.SelectCommand(input);
+
+            if (!decided) return;
+
+            switch (currentUI.index)
+            {
+                case 0:
                     ChangeState(CommandState.MoveSelect);
-                }
-                else if (mainUI.index == 1)
-                {
+                    break;
+
+                case 1:
+                    ChangeState(CommandState.AttackSelect);
+                    break;
+
+                case 2:
+                    ChangeState(CommandState.MagicSelect);
+                    break;
+
+                case 3:
                     ChangeState(CommandState.ItemSelect);
-                }
+                    break;
+
+                case 4:
+                    StartCoroutine(EndTurnDelay());
+                    break;
             }
         }
 
         void MoveSelect()
         {
-            mainPanel.SetActive(false);
-            itemPanel.SetActive(false);
+            // bool moveFlag = false;
+            var input = inputManager.GetInput();
 
-            bool moveFlag = false;
+            switch (input)
+            {
+                case InputCommand.Up:
+                    moveManager.MovePosSelect(0, 1, Direction.Up);
+                    break;
 
-            if (Input.GetKeyDown(KeyCode.UpArrow)) moveFlag = moveManager.MovePlayer(0, 1);
-            if (Input.GetKeyDown(KeyCode.DownArrow)) moveFlag = moveManager.MovePlayer(0, -1);
-            if (Input.GetKeyDown(KeyCode.LeftArrow)) moveFlag = moveManager.MovePlayer(-1, 0);
-            if (Input.GetKeyDown(KeyCode.RightArrow)) moveFlag = moveManager.MovePlayer(1, 0);
-            if (Input.GetKeyDown(KeyCode.Return)) moveFlag = moveManager.MovePlayer(0, 0);
+                case InputCommand.Down:
+                    moveManager.MovePosSelect(0, -1, Direction.Down);
+                    break;
 
-            if (moveFlag)
+                case InputCommand.Left:
+                    moveManager.MovePosSelect(-1, 0, Direction.Left);
+                    break;
+
+                case InputCommand.Right:
+                    moveManager.MovePosSelect(1, 0, Direction.Right);
+                    break;
+
+                case InputCommand.Decide:
+                    // moveFlag = moveManager.MovePosCheck();
+                    if (!isMoving && moveManager.MovePosCheck())
+                    {
+                        StartCoroutine(MoveCoroutine());
+                    }
+                    break;
+
+                case InputCommand.Cancel:
+                    ChangeState(CommandState.MainSelect);
+                    break;
+            }
+
+            // if (moveFlag)
+            // {
+            //     StartCoroutine(EndTurnDelay());
+            // }
+        }
+
+        IEnumerator MoveCoroutine()
+        {
+            isMoving = true;
+            yield return moveManager.PlayerMove();
+            isMoving = false;
+            StartCoroutine(EndTurnDelay());
+        }
+
+        void AttackSelect()
+        {
+            bool attackFlag = false;
+            var input = inputManager.GetInput();
+
+            switch (input)
+            {
+                case InputCommand.Up:
+                    attackManager.AttackPosSelect(0, 1, Direction.Up);
+                    break;
+
+                case InputCommand.Down:
+                    attackManager.AttackPosSelect(0, -1, Direction.Down);
+                    break;
+
+                case InputCommand.Left:
+                    attackManager.AttackPosSelect(-1, 0, Direction.Left);
+                    break;
+
+                case InputCommand.Right:
+                    attackManager.AttackPosSelect(1, 0, Direction.Right);
+                    break;
+
+                case InputCommand.Decide:
+                    attackFlag = attackManager.PlayerAttack();
+                    break;
+
+                case InputCommand.Cancel:
+                    ChangeState(CommandState.MainSelect);
+                    break;
+            }
+
+            if (attackFlag)
             {
                 StartCoroutine(EndTurnDelay());
             }
+        }
 
-            if (Input.GetKeyDown(KeyCode.X))
+        void ItemSelect()
+        {
+            var input = inputManager.GetInput();
+            bool decided = currentUI.SelectCommand(input);
+
+            if (input == InputCommand.Cancel)
             {
                 ChangeState(CommandState.MainSelect);
+                return;
             }
         }
 
-        void ItemSelectPanel()
-        {
-            mainPanel.SetActive(false);
-            itemPanel.SetActive(true);
+        // void ItemSelectPanel()
+        // {
+        //     mainPanel.SetActive(false);
+        //     itemPanel.SetActive(true);
 
-            if (Input.GetKeyDown(KeyCode.UpArrow)) itemUI.MoveUp();
-            if (Input.GetKeyDown(KeyCode.DownArrow)) itemUI.MoveDown();
+        //     if (Input.GetKeyDown(KeyCode.UpArrow)) itemUI.MoveUp();
+        //     if (Input.GetKeyDown(KeyCode.DownArrow)) itemUI.MoveDown();
 
-            if (Input.GetKeyDown(KeyCode.Z))
-            {
-                if (itemUI.index == 1)
-                {
-                    itemManager.UseShild();
-                    Debug.Log("Use Shild!");
-                    ChangeState(CommandState.MainSelect);
-                }
-                else
-                {
-                    ChangeState(CommandState.ItemUse);
-                }
-            }
+        //     if (Input.GetKeyDown(KeyCode.Z))
+        //     {
+        //         if (itemUI.index == 1)
+        //         {
+        //             itemManager.UseShild();
+        //             Debug.Log("Use Shild!");
+        //             ChangeState(CommandState.MainSelect);
+        //         }
+        //         else
+        //         {
+        //             ChangeState(CommandState.ItemUse);
+        //         }
+        //     }
 
-            if (Input.GetKeyDown(KeyCode.X))
-            {
-                ChangeState(CommandState.MainSelect);
-            }
-        }
+        //     if (Input.GetKeyDown(KeyCode.X))
+        //     {
+        //         ChangeState(CommandState.MainSelect);
+        //     }
+        // }
 
-        void UseItem()
-        {
-            mainPanel.SetActive(false);
-            itemPanel.SetActive(false);
+        // void UseItem()
+        // {
+        //     mainPanel.SetActive(false);
+        //     itemPanel.SetActive(false);
 
-            int perX = 0, perY = 0;
-            bool inputFlag = false;
-            bool useFlag = false;
+        //     int perX = 0, perY = 0;
+        //     bool inputFlag = false;
+        //     bool useFlag = false;
 
-            if (Input.GetKeyDown(KeyCode.UpArrow)) perY = 1; inputFlag = true;
-            if (Input.GetKeyDown(KeyCode.DownArrow)) perY = -1; inputFlag = true;
-            if (Input.GetKeyDown(KeyCode.LeftArrow)) perX = -1; inputFlag = true;
-            if (Input.GetKeyDown(KeyCode.RightArrow)) perX = 1; inputFlag = true;
+        //     if (Input.GetKeyDown(KeyCode.UpArrow)) perY = 1; inputFlag = true;
+        //     if (Input.GetKeyDown(KeyCode.DownArrow)) perY = -1; inputFlag = true;
+        //     if (Input.GetKeyDown(KeyCode.LeftArrow)) perX = -1; inputFlag = true;
+        //     if (Input.GetKeyDown(KeyCode.RightArrow)) perX = 1; inputFlag = true;
 
-            if (inputFlag)
-            {
-                useFlag = itemManager.UseBomb(perX, perY);
-                if (useFlag)
-                {
-                    ChangeState(CommandState.MainSelect);
-                }
-            }
+        //     if (inputFlag)
+        //     {
+        //         useFlag = itemManager.UseBomb(perX, perY);
+        //         if (useFlag)
+        //         {
+        //             ChangeState(CommandState.MainSelect);
+        //         }
+        //     }
 
-            if (Input.GetKeyDown(KeyCode.X))
-            {
-                ChangeState(CommandState.ItemSelect);
-            }
-        }
+        //     if (Input.GetKeyDown(KeyCode.X))
+        //     {
+        //         ChangeState(CommandState.ItemSelect);
+        //     }
+        // }
     }
 }

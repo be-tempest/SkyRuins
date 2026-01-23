@@ -1,7 +1,6 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using Data;
 using Pool;
 
 namespace Board
@@ -9,10 +8,10 @@ namespace Board
     public class SlideManager : MonoBehaviour
     {
         [SerializeField] private BoardData boardData;
-        [SerializeField] private PlayerData playerData;
+        [SerializeField] private Player.PlayerData playerData;
 
-        [SerializeField] private float _slideDuration = 0.40f;
-        public float slideDuration => _slideDuration;
+        [SerializeField] private float slideDuration = 0.40f;
+        // public float slideDuration => _slideDuration;
 
         private int[,] preGridData;
         private PooledObject[,] preGridObjects;
@@ -81,8 +80,8 @@ namespace Board
                         }
                     }
 
-                    if (playerData.playerX == col) playerData.SetPlayer(playerData.playerX, playerData.playerY + sign);
-                    if (playerData.playerY == row) playerData.SetPlayer(playerData.playerX + sign, playerData.playerY);
+                    if (playerData.playerX == col) playerData.SetPlayerPos(playerData.playerX, playerData.playerY + sign);
+                    if (playerData.playerY == row) playerData.SetPlayerPos(playerData.playerX + sign, playerData.playerY);
 
                     SetBoardData(0, null, null, col, row);
                     foreach (var m in moveList) routines.Add(StartCoroutine(MoveAnimated(m.obj.transform, m.from, m.to)));

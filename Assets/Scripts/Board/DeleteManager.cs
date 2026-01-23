@@ -1,13 +1,11 @@
 using UnityEngine;
 using System.Collections.Generic;
-using Data;
 
 namespace Board
 {
     public class DeleteManager : MonoBehaviour
     {
         [SerializeField] private BoardData boardData;
-        [SerializeField] private PlayerData playerData;
 
         public bool DeleteBlocks(List<(int x, int y)>[] insertedBlocks)
         {
@@ -26,12 +24,18 @@ namespace Board
                         case 3: tx = x; ty = boardData.fullSize - 1; break;
                     }
 
+                    if (boardData.gridData[tx, ty] == 1) isGameOver = true;
+                    if (boardData.gridData[tx, ty] == 3) 
+                    {
+                        var enemyUnit = boardData.occupants[tx, ty].GetComponent<Enemies.EnemyUnit>();
+                        enemyUnit.Die();
+                    }
+
                     boardData.gridObjects[tx, ty].Release();
                     boardData.occupants[tx, ty]?.Release();
                     boardData.SetGridData(0, tx, ty);
                     boardData.SetGridObjects(null, tx, ty);
                     boardData.SetOccupants(null, tx, ty);
-                    if (playerData.playerX == tx && playerData.playerY == ty) isGameOver = true;
                 }
             }
 

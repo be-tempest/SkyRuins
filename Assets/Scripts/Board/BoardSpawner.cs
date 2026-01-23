@@ -1,13 +1,14 @@
 using UnityEngine;
-using Data;
 using Pool;
+
 
 namespace Board
 {
     public class BoardSpawner : MonoBehaviour
     {
         [SerializeField] private BoardData boardData;
-        [SerializeField] private PlayerData playerData;
+        [SerializeField] private Player.PlayerData playerData;
+        [SerializeField] private Enemies.EnemyRegistry enemyRegistry;
 
         // 確率設定
         [Header("Probability")]
@@ -37,7 +38,7 @@ namespace Board
             }
 
             int center = (boardData.fullSize - 1) / 2;
-            playerData.SetPlayer(center, center);
+            playerData.SetPlayerPos(center, center);
             boardData.SetGridData(boardData.playerNum, center, center);
             SpawnOccupant(boardData.playerNum, center, center);
         }
@@ -77,6 +78,7 @@ namespace Board
             if (occupantNum == boardData.playerNum)
             {
                 created = playerPool.GetPooledObject();
+                playerData.SetPlayerObject(created);
             }
             else if (occupantNum == boardData.obstacleNum)
             {
@@ -86,6 +88,8 @@ namespace Board
             {
                 int index = UnityEngine.Random.Range(0, enemyPools.Length);
                 created = enemyPools[index].GetPooledObject();
+                var enemyUnit = created.GetComponent<Enemies.EnemyUnit>();
+                enemyUnit.Init(enemyRegistry);
             }
             else
             {

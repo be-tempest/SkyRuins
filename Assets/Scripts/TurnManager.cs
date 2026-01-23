@@ -1,11 +1,13 @@
 using UnityEngine;
 using Board;
 using Player;
+using Enemies;
 
 public class TurnManager : MonoBehaviour
 {
-    [SerializeField] private PlayerManager playerManager;
     [SerializeField] private BoardManager boardManager;
+    [SerializeField] private PlayerManager playerManager;
+    [SerializeField] private EnemyManager enemyManager;
 
     private int turnCount = 1;
     bool isGameOver = false;
@@ -13,6 +15,7 @@ public class TurnManager : MonoBehaviour
     private void Start()
     {
         boardManager.InitBoard();
+        playerManager.InitPlayer();
         BoardTurn();
     }
 
@@ -23,6 +26,22 @@ public class TurnManager : MonoBehaviour
     }
 
     private void BoardTurnEnd()
+    {
+        EnemyTurn();
+    }
+
+    private void EnemyTurn()
+    {
+        if (isGameOver) return;
+        if (turnCount == 1)
+        {
+            PlayerTurn();
+            return;
+        }
+        enemyManager.StartEnemyTurn(EnemyTurnEnd, GameOver);
+    }
+
+    private void EnemyTurnEnd()
     {
         PlayerTurn();
     }
