@@ -14,6 +14,7 @@ namespace Player
         [SerializeField] private InputManager inputManager;
         [SerializeField] private MoveManager moveManager;
         [SerializeField] private AttackManager attackManager;
+        [SerializeField] private MagicManager magicManager;
         [SerializeField] private ItemManager itemManager;
 
         [System.Serializable]
@@ -30,11 +31,14 @@ namespace Player
         private CommandUI currentUI = null;
 
         private bool isMoving = false;
+        private bool isMagic = false;
+        private bool isItem = false;
 
         public void InitPlayer()
         {
             moveManager.SetAnimation();
             attackManager.SetAnimation();
+            magicManager.SetAnimation();
         }
 
         public void StartPlayerTurn(Action turnEnd, Action gameOver)
@@ -75,13 +79,19 @@ namespace Player
                     break;
 
                 case CommandState.MagicSelect:
+                    MagicSelect();
+                    break;
+
+                case CommandState.MagicExecute:
+                    MagicExecute();
                     break;
 
                 case CommandState.ItemSelect:
                     ItemSelect();
                     break;
 
-                case CommandState.ItemUse:
+                case CommandState.ItemExecute:
+                    ItemExecute();
                     break;
             }
         }
@@ -128,7 +138,13 @@ namespace Player
                     moveManager.Clear();
                     break;
                 case CommandState.AttackSelect:
-                    attackManager.Clear(); 
+                    attackManager.Clear();
+                    break;
+                case CommandState.MagicExecute:
+                    magicManager.Clear();
+                    break;
+                case CommandState.ItemExecute:
+                    itemManager.Clear();
                     break;
             }
         }
@@ -166,7 +182,6 @@ namespace Player
 
         void MoveSelect()
         {
-            // bool moveFlag = false;
             var input = inputManager.GetInput();
 
             switch (input)
@@ -188,7 +203,6 @@ namespace Player
                     break;
 
                 case InputCommand.Decide:
-                    // moveFlag = moveManager.MovePosCheck();
                     if (!isMoving && moveManager.MovePosCheck())
                     {
                         StartCoroutine(MoveCoroutine());
@@ -199,11 +213,6 @@ namespace Player
                     ChangeState(CommandState.MainSelect);
                     break;
             }
-
-            // if (moveFlag)
-            // {
-            //     StartCoroutine(EndTurnDelay());
-            // }
         }
 
         IEnumerator MoveCoroutine()
@@ -252,73 +261,128 @@ namespace Player
             }
         }
 
-        void ItemSelect()
+        void MagicSelect()
         {
             var input = inputManager.GetInput();
-            bool decided = currentUI.SelectCommand(input);
 
             if (input == InputCommand.Cancel)
             {
                 ChangeState(CommandState.MainSelect);
                 return;
             }
+
+            bool decided = currentUI.SelectCommand(input);
+
+            if (!decided) return;
+
+            magicManager.MagicSetup(currentUI.index);
+            ChangeState(CommandState.MagicExecute);
         }
 
-        // void ItemSelectPanel()
-        // {
-        //     mainPanel.SetActive(false);
-        //     itemPanel.SetActive(true);
+        void MagicExecute()
+        {
+            bool magicFlag = false;
+            var input = inputManager.GetInput();
 
-        //     if (Input.GetKeyDown(KeyCode.UpArrow)) itemUI.MoveUp();
-        //     if (Input.GetKeyDown(KeyCode.DownArrow)) itemUI.MoveDown();
+            switch (input)
+            {
+                case InputCommand.Up:
+                    magicManager.MagicPosSelect(Direction.Up);
+                    break;
 
-        //     if (Input.GetKeyDown(KeyCode.Z))
-        //     {
-        //         if (itemUI.index == 1)
-        //         {
-        //             itemManager.UseShild();
-        //             Debug.Log("Use Shild!");
-        //             ChangeState(CommandState.MainSelect);
-        //         }
-        //         else
-        //         {
-        //             ChangeState(CommandState.ItemUse);
-        //         }
-        //     }
+                case InputCommand.Down:
+                    magicManager.MagicPosSelect(Direction.Down);
+                    break;
 
-        //     if (Input.GetKeyDown(KeyCode.X))
-        //     {
-        //         ChangeState(CommandState.MainSelect);
-        //     }
-        // }
+                case InputCommand.Left:
+                    magicManager.MagicPosSelect(Direction.Left);
+                    break;
 
-        // void UseItem()
-        // {
-        //     mainPanel.SetActive(false);
-        //     itemPanel.SetActive(false);
+                case InputCommand.Right:
+                    magicManager.MagicPosSelect(Direction.Right);
+                    break;
 
-        //     int perX = 0, perY = 0;
-        //     bool inputFlag = false;
-        //     bool useFlag = false;
+                case InputCommand.Decide:
+                    if (!isMagic && magicManager.MagicCheck())
+                    {
+                        StartCoroutine(MagicCoroutine());
+                    }
+                    break;
 
-        //     if (Input.GetKeyDown(KeyCode.UpArrow)) perY = 1; inputFlag = true;
-        //     if (Input.GetKeyDown(KeyCode.DownArrow)) perY = -1; inputFlag = true;
-        //     if (Input.GetKeyDown(KeyCode.LeftArrow)) perX = -1; inputFlag = true;
-        //     if (Input.GetKeyDown(KeyCode.RightArrow)) perX = 1; inputFlag = true;
+                case InputCommand.Cancel:
+                    ChangeState(CommandState.MagicSelect);
+                    break;
+            }
+        }
 
-        //     if (inputFlag)
-        //     {
-        //         useFlag = itemManager.UseBomb(perX, perY);
-        //         if (useFlag)
-        //         {
-        //             ChangeState(CommandState.MainSelect);
-        //         }
-        //     }
+        IEnumerator MagicCoroutine()
+        {
+            isMoving = true;
+            yield return magicManager.PlayerMagic();
+            isMoving = false;
+            StartCoroutine(EndTurnDelay());
+        }
 
-        //     if (Input.GetKeyDown(KeyCode.X))
-        //     {
-        //         ChangeState(CommandState.ItemSelect);
-        //     }
-        // }
+        void ItemSelect()
+        {
+            var input = inputManager.GetInput();
+
+            if (input == InputCommand.Cancel)
+            {
+                ChangeState(CommandState.MainSelect);
+                return;
+            }
+
+            bool decided = currentUI.SelectCommand(input);
+
+            if (!decided) return;
+
+            itemManager.ItemSetup(currentUI.index);
+            ChangeState(CommandState.ItemExecute);
+        }
+
+        void ItemExecute()
+        {
+            bool itemFlag = false;
+            var input = inputManager.GetInput();
+
+            switch (input)
+            {
+                case InputCommand.Up:
+                    itemManager.ItemPosSelect(Direction.Up);
+                    break;
+
+                case InputCommand.Down:
+                    itemManager.ItemPosSelect(Direction.Down);
+                    break;
+
+                case InputCommand.Left:
+                    itemManager.ItemPosSelect(Direction.Left);
+                    break;
+
+                case InputCommand.Right:
+                    itemManager.ItemPosSelect(Direction.Right);
+                    break;
+
+                case InputCommand.Decide:
+                    if (!isMagic && itemManager.ItemCheck())
+                    {
+                        StartCoroutine(ItemCoroutine());
+                    }
+                    break;
+
+                case InputCommand.Cancel:
+                    ChangeState(CommandState.ItemSelect);
+                    break;
+            }
+        }
+
+        IEnumerator ItemCoroutine()
+        {
+            isItem = true;
+            yield return itemManager.PlayerItem();
+            isItem = false;
+            StartCoroutine(EndTurnDelay());
+        }
     }
 }

@@ -7,6 +7,7 @@ public enum CommandState
     MoveSelect,
     AttackSelect,
     MagicSelect,
+    MagicExecute,
     ItemSelect,
-    ItemUse
+    ItemExecute
 }

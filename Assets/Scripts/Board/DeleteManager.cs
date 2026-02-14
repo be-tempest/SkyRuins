@@ -28,7 +28,7 @@ namespace Board
                     if (boardData.gridData[tx, ty] == 3) 
                     {
                         var enemyUnit = boardData.occupants[tx, ty].GetComponent<Enemies.EnemyUnit>();
-                        enemyUnit.Die();
+                        enemyUnit.Dead();
                     }
 
                     boardData.gridObjects[tx, ty].Release();

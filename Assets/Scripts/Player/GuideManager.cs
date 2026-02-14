@@ -10,6 +10,8 @@ namespace Player
 
         [SerializeField] private Color moveColor;
         [SerializeField] private Color attackColor;
+        [SerializeField] private Color magicColor;
+        [SerializeField] private Color itemColor;
 
         private List<PooledObject> guides = new();
 
@@ -25,6 +27,12 @@ namespace Player
                     break;
                 case CommandState.AttackSelect:
                     renderer.material.color = attackColor;
+                    break;
+                case CommandState.MagicSelect:
+                    renderer.material.color = magicColor;
+                    break;
+                case CommandState.ItemSelect:
+                    renderer.material.color = itemColor;
                     break;
             }
             

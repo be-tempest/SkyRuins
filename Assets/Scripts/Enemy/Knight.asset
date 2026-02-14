@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   name: Knight
   maxHP: 10
-  attack: 3
+  attack: 20
   actions:
   - {fileID: 11400000, guid: e89d8dbd9a8a9cd4a84f826369f18de7, type: 2}

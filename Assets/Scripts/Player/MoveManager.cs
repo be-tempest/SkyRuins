@@ -75,6 +75,9 @@ namespace Player
 
         public IEnumerator PlayerMove()
         {
+            moveCurser.SetActive(false);
+            guideManager.Clear();
+            
             playerAnimation.SetDirection(moveDir);
             playerAnimation.PlayMove(true);
             
@@ -87,6 +90,7 @@ namespace Player
 
             if (boardData.gridData[movePosX, movePosY] == boardData.itemNum)
             {
+                AudioManager.Instance.PlaySE(SEType.Item);
                 var itemData = boardData.occupants[movePosX, movePosY].GetComponent<ItemData>();
                 playerData.itemList.Add(itemData.itemDefinition);
                 boardData.occupants[movePosX, movePosY].Release();

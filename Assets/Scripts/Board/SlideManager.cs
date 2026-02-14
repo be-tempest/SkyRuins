@@ -88,7 +88,7 @@ namespace Board
                 }
 
                 foreach (var r in routines) yield return r;
-                yield return new WaitForSeconds(0.03f);
+                yield return new WaitForSeconds(0.5f);
             }
         }
 
@@ -102,6 +102,7 @@ namespace Board
         private IEnumerator MoveAnimated(Transform t, Vector3 from, Vector3 to)
         {
             float elapsed = 0f;
+            AudioManager.Instance.PlaySE(SEType.Slide);
             while (elapsed < slideDuration)
             {
                 elapsed += Time.deltaTime;
@@ -110,6 +111,7 @@ namespace Board
                 yield return null;
             }
             t.position = to;
+            AudioManager.Instance.StopSE();
         }
     }
 }

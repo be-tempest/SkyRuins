@@ -19,4 +19,19 @@ public class SceneManager : MonoBehaviour
         // リザルトシーン読み込み
         UnityEngine.SceneManagement.SceneManager.LoadScene("Result");
     }
+
+    public void OnExitGame()
+    {
+        // ゲーム終了
+        if (Application.isEditor)
+        {
+            // エディタ上ではプレイモードを停止
+            UnityEditor.EditorApplication.isPlaying = false;
+        }
+        else
+        {
+            // ビルドされたゲームではアプリケーションを終了
+            Application.Quit();
+        }
+    }
 }

@@ -44,13 +44,13 @@ namespace Player
             if (boardData.gridData[attackPosX, attackPosY] == boardData.enemyNum)
             {
                 var enemyUnit = boardData.occupants[attackPosX, attackPosY].GetComponent<EnemyUnit>();
-                enemyUnit.TakeDamage(playerData.attack);
-                if (enemyUnit.currentHP <= 0)
-                {
-                    boardData.occupants[attackPosX, attackPosY].Release();
-                    boardData.SetGridData(0, attackPosX, attackPosY);
-                    boardData.SetOccupants(null, attackPosX, attackPosY);
-                }
+                enemyUnit.TakeDamage(playerData.attack, attackPosX, attackPosY);
+                // if (enemyUnit.currentHP <= 0)
+                // {
+                //     boardData.occupants[attackPosX, attackPosY].Release();
+                //     boardData.SetGridData(0, attackPosX, attackPosY);
+                //     boardData.SetOccupants(null, attackPosX, attackPosY);
+                // }
             }
 
             Clear();

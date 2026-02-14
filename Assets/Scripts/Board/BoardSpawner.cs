@@ -1,4 +1,5 @@
 using UnityEngine;
+using System;
 using Pool;
 
 
@@ -25,8 +26,9 @@ namespace Board
         [SerializeField] private ObjectPool[] itemPools;
 
         // 盤面生成
-        public void InitBoard()
+        public void InitBoard(Action gameOver)
         {
+            playerData.OnGameOver += gameOver;
             boardData.Init();
 
             for (int x = 1; x <= boardData.coreSize; x++)
@@ -79,6 +81,8 @@ namespace Board
             {
                 created = playerPool.GetPooledObject();
                 playerData.SetPlayerObject(created);
+                var playerAnim = created.GetComponent<Player.PlayerAnimation>();
+                playerAnim.Initialize(playerData);
             }
             else if (occupantNum == boardData.obstacleNum)
             {
@@ -89,7 +93,7 @@ namespace Board
                 int index = UnityEngine.Random.Range(0, enemyPools.Length);
                 created = enemyPools[index].GetPooledObject();
                 var enemyUnit = created.GetComponent<Enemies.EnemyUnit>();
-                enemyUnit.Init(enemyRegistry);
+                enemyUnit.Init(enemyRegistry, boardData);
             }
             else
             {

@@ -18,10 +18,10 @@ namespace Board
         private int[] addCount = new int[4];
         private List<(int x, int y)>[] insertedBlocks = new List<(int, int)>[4];
 
-        public void InitBoard()
+        public void InitBoard(Action gameOver)
         {
             // 初期生成
-            boardSpawner.InitBoard();
+            boardSpawner.InitBoard(gameOver);
         }
 
         public void StartBoardTurn(int turnCount, Action turnEnd, Action gameOver)

@@ -27,8 +27,10 @@ namespace Enemies
                 foreach (var action in enemy.Definition.actions)
                 {
                     yield return action.Execute(enemy, boardData, playerData);
+                    // yield return new WaitForSeconds(0.5f);
                 }
             }
+
             end?.Invoke();
         }
     }
