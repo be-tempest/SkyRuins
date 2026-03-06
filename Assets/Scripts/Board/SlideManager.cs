@@ -1,45 +1,53 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using Pool;
+using SkyRuins.Player;
 
-namespace Board
+namespace SkyRuins.Board
 {
+    // ブロックのスライド処理を管理
+
     public class SlideManager : MonoBehaviour
     {
+        [Header("References")]
         [SerializeField] private BoardData boardData;
-        [SerializeField] private Player.PlayerData playerData;
+        [SerializeField] private PlayerData playerData;
 
+        [Header("スライド時間")]
         [SerializeField] private float slideDuration = 0.40f;
-        // public float slideDuration => _slideDuration;
 
-        private int[,] preGridData;
-        private PooledObject[,] preGridObjects;
-        private PooledObject[,] preOccupants;
+        private int[,] preGridData; // 盤面データのコピー
+        private PooledObject[,] preGridObjects; // 盤面ブロックオブジェクトのコピー
+        private PooledObject[,] preOccupants; // 盤面占有オブジェクトのコピー
 
+        // ブロックのスライド処理
         public IEnumerator SlideBlocks(List<(int x, int y)>[] insertedBlocks)
         {
-            bool isHorizontal = false;
-            int sign = 0;
-            List<Coroutine> routines = new List<Coroutine>();
+            bool isHorizontal = false; // 行方向スライドか列方向スライドか
+            int sign = 0; // スライド方向の符号（1 or -1）
+            List<Coroutine> routines = new List<Coroutine>(); // スライドアニメーションのコルーチンリスト
 
             for (int i = 0; i < 4; i++)
             {
                 switch (i)
                 {
-                    case 0: isHorizontal = true; sign = 1; break;
-                    case 1: isHorizontal = false; sign = -1; break;
-                    case 2: isHorizontal = true; sign = -1; break;
-                    case 3: isHorizontal = false; sign = 1; break;
+                    case 0: isHorizontal = true; sign = 1; break; // 左から右
+                    case 1: isHorizontal = false; sign = -1; break; // 上から下
+                    case 2: isHorizontal = true; sign = -1; break; // 右から左
+                    case 3: isHorizontal = false; sign = 1; break; // 下から上
                 }
 
+                // スライド前の盤面データをコピー
                 preGridData = (int[,])boardData.gridData.Clone();
                 preGridObjects = (PooledObject[,])boardData.gridObjects.Clone();
                 preOccupants = (PooledObject[,])boardData.occupants.Clone();
 
                 foreach ((int col, int row) in insertedBlocks[i])
                 {
-                    var moveList = new List<(PooledObject obj, Vector3 from, Vector3 to)>();
+                    // 追加ブロック位置から各ブロックの移動元と移動先の座標を計算
+                    // moveListにスライド対象のブロックと移動元・移動先座標を追加
+                    // BoardDataを更新
+                    var moveList = new List<(PooledObject obj, Vector3 from, Vector3 to)>(); // スライド対象のブロックと移動元・移動先座標のリスト
 
                     if (isHorizontal)
                     {
@@ -80,18 +88,21 @@ namespace Board
                         }
                     }
 
+                    SetBoardData(0, null, null, col, row); // 追加ブロック位置は空にする
+
+                    // プレイヤーがスライドする行/列にいる場合はプレイヤー位置も更新
                     if (playerData.playerX == col) playerData.SetPlayerPos(playerData.playerX, playerData.playerY + sign);
                     if (playerData.playerY == row) playerData.SetPlayerPos(playerData.playerX + sign, playerData.playerY);
 
-                    SetBoardData(0, null, null, col, row);
-                    foreach (var m in moveList) routines.Add(StartCoroutine(MoveAnimated(m.obj.transform, m.from, m.to)));
+                    foreach (var m in moveList) routines.Add(StartCoroutine(MoveAnimated(m.obj.transform, m.from, m.to))); // スライドアニメーションのコルーチンをリストに追加
                 }
 
-                foreach (var r in routines) yield return r;
+                foreach (var r in routines) yield return r; // 同方向のスライドアニメーションを同時に開始
                 yield return new WaitForSeconds(0.5f);
             }
         }
 
+        // BoardDataの更新をまとめて行う関数
         private void SetBoardData(int data, PooledObject obj, PooledObject occ, int x, int y)
         {
             boardData.SetGridData(data, x, y);
@@ -99,6 +110,7 @@ namespace Board
             boardData.SetOccupants(occ, x, y);
         }
 
+        // スライドアニメーションのコルーチン
         private IEnumerator MoveAnimated(Transform t, Vector3 from, Vector3 to)
         {
             float elapsed = 0f;

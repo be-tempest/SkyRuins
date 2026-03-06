@@ -3,21 +3,24 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.Pool;
 
-namespace Pool
+namespace SkyRuins
 {
+    // オブジェクトプール・プール管理用
+    
     public class ObjectPool : MonoBehaviour
     {
-        [SerializeField] private uint initPoolSize;
-        [SerializeField] private PooledObject objectToPool;
-        // コレクション内のプールされたオブジェクトを格納する
-        private Stack<PooledObject> stack;
+        [Header("References")]
+        [SerializeField] private uint initPoolSize; // プールの初期サイズ
+        [SerializeField] private PooledObject objectToPool; // プールするオブジェクトのプレハブ
+
+        private Stack<PooledObject> stack; // コレクション内のプールされたオブジェクトを格納する
 
         private void Awake()
         {
             SetupPool();
         }
 
-        // プールを作成する（ラグが目立たないときに呼び出す）
+        // プールを作成する
         private void SetupPool()
         {
             stack = new Stack<PooledObject>();
@@ -34,18 +37,21 @@ namespace Pool
         // プールから最初のアクティブなゲームオブジェクトを返す
         public PooledObject GetPooledObject()
         {
+            // プールが空なら新しいものを生成
             if (stack.Count == 0)
             {
                 PooledObject newInstance = Instantiate(objectToPool, this.transform);
                 newInstance.Pool = this;
                 return newInstance;
             }
-            // それ以外の場合は、リストから次のものをグラブする
+
+            // それ以外の場合はプールから次のものを返す
             PooledObject nextInstance = stack.Pop();
             nextInstance.gameObject.SetActive(true);
             return nextInstance;
         }
 
+        // プールにオブジェクトを戻す
         public void ReturnToPool(PooledObject pooledObject)
         {
             stack.Push(pooledObject);

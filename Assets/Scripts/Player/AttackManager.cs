@@ -1,29 +1,37 @@
 using UnityEngine;
-using Enemies;
-using Pool;
+using SkyRuins.Board;
+using SkyRuins.Enemies;
+using SkyRuins.Common;
 
-namespace Player
+namespace SkyRuins.Player
 {
+    // プレイヤーの攻撃を管理するクラス
+
     public class AttackManager : MonoBehaviour
     {
-        [SerializeField] private Board.BoardData boardData;
+        [Header("References")]
+        [SerializeField] private BoardData boardData;
         [SerializeField] private PlayerData playerData;
         [SerializeField] private GuideManager guideManager;
         [SerializeField] private PlayerAnimation playerAnimation;
 
-        private int attackPosX = 0;
-        private int attackPosY = 0;
-        private Direction attackDir = Direction.Up;
+        private int attackPosX = 0; // 攻撃位置のX座標
+        private int attackPosY = 0; // 攻撃位置のY座標
+        private Direction attackDir = Direction.Up; // 攻撃の向き
 
+        // アニメーションの設定関数
         public void SetAnimation()
         {
             playerAnimation = playerData.playerObject.GetComponent<PlayerAnimation>();
         }
 
+        // 攻撃位置を選択する関数
         public void AttackPosSelect(int perX, int perY, Direction dir)
         {
             int posX = playerData.playerX + perX;
             int posY = playerData.playerY + perY;
+
+            // 攻撃位置がコアの範囲内であれば、攻撃位置として設定
             if (boardData.IsInsideCore(posX, posY))
             {
                 guideManager.Clear();
@@ -34,6 +42,7 @@ namespace Player
             }
         }
 
+        // プレイヤーの攻撃を実行する関数
         public bool PlayerAttack()
         {
             if (attackPosX == 0 && attackPosY == 0) return false;
@@ -41,16 +50,11 @@ namespace Player
             playerAnimation.SetDirection(attackDir);
             playerAnimation.PlayAttack();
 
+            // 攻撃位置に敵がいる場合、ダメージを与える
             if (boardData.gridData[attackPosX, attackPosY] == boardData.enemyNum)
             {
                 var enemyUnit = boardData.occupants[attackPosX, attackPosY].GetComponent<EnemyUnit>();
                 enemyUnit.TakeDamage(playerData.attack, attackPosX, attackPosY);
-                // if (enemyUnit.currentHP <= 0)
-                // {
-                //     boardData.occupants[attackPosX, attackPosY].Release();
-                //     boardData.SetGridData(0, attackPosX, attackPosY);
-                //     boardData.SetOccupants(null, attackPosX, attackPosY);
-                // }
             }
 
             Clear();
@@ -58,6 +62,7 @@ namespace Player
             return true;
         }
 
+        // 攻撃位置とガイドをクリアする関数
         public void Clear()
         {
             attackPosX = 0;

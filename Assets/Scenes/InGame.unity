@@ -4026,7 +4026,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1023274168}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: SceneManager, Assembly-CSharp
         m_MethodName: OnEnterInGame
         m_Mode: 1
@@ -8000,10 +8000,10 @@ MonoBehaviour:
   boardData: {fileID: 1049641640}
   playerData: {fileID: 3751998795641295261}
   enemyRegistry: {fileID: 529753691}
-  enemyProb: 0.2
+  enemyProb: 0.05
   itemProb: 0.05
-  obstacleBaseProb: 0.2
-  increasePerLevel: 0.02
+  obstacleBaseProb: 0.05
+  increasePerLevel: 0.01
   blockPools:
   - {fileID: 2017893325}
   - {fileID: 1027409768}
@@ -8759,7 +8759,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1023274168}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: SceneManager, Assembly-CSharp
         m_MethodName: OnEnterTitle
         m_Mode: 1
@@ -11214,6 +11214,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   boardData: {fileID: 1049641640}
+  playerData: {fileID: 0}
 --- !u!1 &1926871249
 GameObject:
   m_ObjectHideFlags: 0
@@ -12345,7 +12346,6 @@ MonoBehaviour:
   playerManager: {fileID: 1878396269}
   enemyManager: {fileID: 1607964642}
   gameOverUI: {fileID: 1516305214}
-  turnCount: 1
   bannerObject: {fileID: 986921618}
   bannerText: {fileID: 420181993}
 --- !u!1 &2017028695

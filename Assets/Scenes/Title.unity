@@ -1376,16 +1376,16 @@ MonoBehaviour:
   seSource: {fileID: 5728355238874021743}
   titleBgm: {fileID: 8300000, guid: fa1ac955ce5327d4f83d57d311389da9, type: 3}
   gameBgm: {fileID: 8300000, guid: d2055187e1303624ab447de3707c6f1c, type: 3}
-  gameOver: {fileID: 8300000, guid: d2055187e1303624ab447de3707c6f1c, type: 3}
-  footstep: {fileID: 8300000, guid: d2055187e1303624ab447de3707c6f1c, type: 3}
-  attack: {fileID: 8300000, guid: eee95d716feb2fd4797a7ba7967f9c3e, type: 3}
-  flame: {fileID: 8300000, guid: d2055187e1303624ab447de3707c6f1c, type: 3}
-  ice: {fileID: 8300000, guid: d2055187e1303624ab447de3707c6f1c, type: 3}
-  slide: {fileID: 8300000, guid: d2055187e1303624ab447de3707c6f1c, type: 3}
-  item: {fileID: 8300000, guid: d2055187e1303624ab447de3707c6f1c, type: 3}
-  select: {fileID: 0}
-  decide: {fileID: 0}
-  cancel: {fileID: 0}
+  gameOver: {fileID: 8300000, guid: a0a98bfa19283914d8642a46c6ddc902, type: 3}
+  footstep: {fileID: 8300000, guid: 1a0e0357b7e20784087d0ada084a2622, type: 3}
+  attack: {fileID: 8300000, guid: 827cadaf0ce577d4583be9036c9add95, type: 3}
+  flame: {fileID: 8300000, guid: d57837bb293f53040b70f835186de73e, type: 3}
+  ice: {fileID: 8300000, guid: eda472aaa71190941b3480e816244d9e, type: 3}
+  slide: {fileID: 8300000, guid: 34a3b80c709f3fb44a8f49650937c7c4, type: 3}
+  item: {fileID: 8300000, guid: c169b0165c0f8cf45a3ebfa165ca271e, type: 3}
+  select: {fileID: 8300000, guid: 11521f1889860f0449f5542e445d313e, type: 3}
+  decide: {fileID: 8300000, guid: 286d4c6c6c648a3429771accf61b9f3b, type: 3}
+  cancel: {fileID: 8300000, guid: c95938cc3ca09404aa503467d7836b57, type: 3}
 --- !u!1 &3092197722676278381
 GameObject:
   m_ObjectHideFlags: 0

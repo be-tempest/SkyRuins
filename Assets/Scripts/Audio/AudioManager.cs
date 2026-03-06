@@ -1,116 +1,132 @@
 using UnityEngine;
 
-public enum SEType
+namespace SkyRuins
 {
-    Footstep,
-    Attack,
-    Flame,
-    Ice,
-    Item,
-    Slide,
-    Select,
-    Decide,
-    Cancel
-}
-
-public class AudioManager : MonoBehaviour
-{
-    public static AudioManager Instance;
-
-    [Header("Audio Sources")]
-    [SerializeField] private AudioSource bgmSource;
-    [SerializeField] private AudioSource seSource;
-
-    [Header("BGM Clips")]
-    [SerializeField] private AudioClip titleBgm;
-    [SerializeField] private AudioClip gameBgm;
-    [SerializeField] private AudioClip gameOver;
-
-    [Header("SE Clips")]
-    [SerializeField] private AudioClip footstep;
-    [SerializeField] private AudioClip attack;
-    [SerializeField] private AudioClip flame;
-    [SerializeField] private AudioClip ice;
-    [SerializeField] private AudioClip slide;
-    [SerializeField] private AudioClip item;
-    [SerializeField] private AudioClip select;
-    [SerializeField] private AudioClip decide;
-    [SerializeField] private AudioClip cancel;
-
-
-    private void Awake()
+    // SEの種類
+    public enum SEType
     {
-        if (Instance == null)
-            Instance = this;
-        else
-            Destroy(gameObject);
+        Footstep,
+        Attack,
+        Flame,
+        Ice,
+        Item,
+        Slide,
+        Select,
+        Decide,
+        Cancel
     }
 
-    public void PlayTitleBGM()
-    {
-        bgmSource.clip = titleBgm;
-        bgmSource.loop = true;
-        bgmSource.Play();
-    }
+    // ゲーム全体のオーディオ管理
 
-    public void PlayGameBGM()
+    public class AudioManager : MonoBehaviour
     {
-        bgmSource.clip = gameBgm;
-        bgmSource.loop = true;
-        bgmSource.Play();
-    }
+        public static AudioManager Instance; // シングルトンインスタンス
 
-    public void PlayGameOverBGM()
-    {
-        bgmSource.clip = gameOver;
-        bgmSource.loop = true;
-        bgmSource.Play();
-    }
+        [Header("Audio Sources")]
+        [SerializeField] private AudioSource bgmSource; // BGM用オーディオソース
+        [SerializeField] private AudioSource seSource; // SE用オーディオソース
 
-    public void PlaySE(SEType type)
-    {
-        switch (type)
+        [Header("BGM Clips")]
+        [SerializeField] private AudioClip titleBgm; // タイトルBGM
+        [SerializeField] private AudioClip gameBgm; // インゲームBGM
+        [SerializeField] private AudioClip gameOver; // ゲームオーバーBGM
+
+        [Header("SE Clips")]
+        [SerializeField] private AudioClip footstep; // 足音
+        [SerializeField] private AudioClip attack; // 攻撃
+        [SerializeField] private AudioClip flame; // フレイム
+        [SerializeField] private AudioClip ice; // アイスピラー
+        [SerializeField] private AudioClip slide; // スライド
+        [SerializeField] private AudioClip item; // アイテム取得
+        [SerializeField] private AudioClip select; // 選択
+        [SerializeField] private AudioClip decide; // 決定
+        [SerializeField] private AudioClip cancel; // キャンセル
+
+
+        private void Awake()
         {
-            case SEType.Footstep:
-                seSource.PlayOneShot(footstep);
-                break;
+            // 二重生成防止
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
 
-            case SEType.Attack:
-                seSource.PlayOneShot(attack);
-                break;
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
 
-            case SEType.Flame:
-                seSource.PlayOneShot(flame);
-                break;
+        // タイトルBGM再生
+        public void PlayTitleBGM()
+        {
+            bgmSource.clip = titleBgm;
+            bgmSource.loop = true;
+            bgmSource.Play();
+        }
 
-            case SEType.Ice:
-                seSource.PlayOneShot(ice);
-                break;
+        // インゲームBGM再生
+        public void PlayGameBGM()
+        {
+            bgmSource.clip = gameBgm;
+            bgmSource.loop = true;
+            bgmSource.Play();
+        }
 
-            case SEType.Item:
-                seSource.PlayOneShot(item);
-                break;
+        // ゲームオーバーBGM再生
+        public void PlayGameOverBGM()
+        {
+            bgmSource.clip = gameOver;
+            bgmSource.loop = true;
+            bgmSource.Play();
+        }
 
-            case SEType.Slide:
-                seSource.PlayOneShot(slide);
-                break;
+        // SE再生
+        public void PlaySE(SEType type)
+        {
+            switch (type)
+            {
+                case SEType.Footstep: // 足音
+                    seSource.PlayOneShot(footstep);
+                    break;
 
-            case SEType.Select:
-                seSource.PlayOneShot(select);
-                break;
+                case SEType.Attack: // 攻撃
+                    seSource.PlayOneShot(attack);
+                    break;
 
-            case SEType.Decide:
-                seSource.PlayOneShot(decide);
-                break;
+                case SEType.Flame: // フレイム
+                    seSource.PlayOneShot(flame);
+                    break;
 
-            case SEType.Cancel:
-                seSource.PlayOneShot(cancel);
-                break;
+                case SEType.Ice: // アイスピラー
+                    seSource.PlayOneShot(ice);
+                    break;
+
+                case SEType.Item: // アイテム取得
+                    seSource.PlayOneShot(item);
+                    break;
+
+                case SEType.Slide: // スライド
+                    seSource.PlayOneShot(slide);
+                    break;
+
+                case SEType.Select: // 選択
+                    seSource.PlayOneShot(select);
+                    break;
+
+                case SEType.Decide: // 決定
+                    seSource.PlayOneShot(decide);
+                    break;
+
+                case SEType.Cancel: // キャンセル
+                    seSource.PlayOneShot(cancel);
+                    break;
+            }
+        }
+
+        // SE停止
+        public void StopSE()
+        {
+            seSource.Stop();
         }
     }
-
-    public void StopSE()
-    {
-        seSource.Stop();
-    }   
 }

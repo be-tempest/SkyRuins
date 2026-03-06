@@ -1,19 +1,25 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using SkyRuins.Common;
 
-namespace Enemies
+namespace SkyRuins.Enemies
 {
     [CreateAssetMenu(menuName = "Enemy/Action/Attack")]
+    
+    // 敵の攻撃行動を定義するクラス
+
     public class EnemyAttack : EnemyActionDefinition
     {
-        public List<Vector2Int> attackRanges;
+        public List<Vector2Int> attackRanges; // 攻撃範囲
 
+        // 敵の攻撃行動を実行する関数
         public override IEnumerator Execute(EnemyUnit enemy, Board.BoardData boardData, Player.PlayerData playerData)
         {
-            Vector2Int enemyPos = boardData.FindEnemyPos(enemy.gameObject);
-            Vector2Int playerPos = new Vector2Int(playerData.playerX, playerData.playerY);
+            Vector2Int enemyPos = boardData.FindEnemyPos(enemy.gameObject); // 敵の現在位置を取得
+            Vector2Int playerPos = new Vector2Int(playerData.playerX, playerData.playerY); // プレイヤーの現在位置を取得
 
+            // 全方向に対して攻撃範囲を回転させ、プレイヤーが攻撃範囲内にいるかをチェック
             foreach (Direction dir in AllDirections)
             {
                 foreach (var range in attackRanges)
@@ -21,7 +27,6 @@ namespace Enemies
                     Vector2Int attackPos = RotatePos(range, dir);
                     if (enemyPos + attackPos == playerPos)
                     {
-                        Debug.Log($"{enemy.name} attacks Player!");
                         enemy.enemyAnimation.SetDirection(dir);
                         enemy.enemyAnimation.PlayAttack();
                         var playerAnimation = playerData.playerObject.GetComponent<Player.PlayerAnimation>();
@@ -36,7 +41,8 @@ namespace Enemies
 
             yield return null;
         }
-        
+
+        // 方向を反転させる関数
         private Direction OppositeDirection(Direction dir)
         {
             switch (dir)

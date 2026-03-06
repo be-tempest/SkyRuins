@@ -1,20 +1,25 @@
 using UnityEngine;
 using System.Collections.Generic;
+using SkyRuins.Player;
 
-namespace Board
+namespace SkyRuins.Board
 {
+    // スライド後のブロックの削除を管理
+
     public class DeleteManager : MonoBehaviour
     {
+        [Header("References")]
         [SerializeField] private BoardData boardData;
+        [SerializeField] private PlayerData playerData;
 
-        public bool DeleteBlocks(List<(int x, int y)>[] insertedBlocks)
+        // ブロックの削除
+        public void DeleteBlocks(List<(int x, int y)>[] insertedBlocks)
         {
-            bool isGameOver = false;
-
             for (int i = 0; i < 4; i++)
             {
                 foreach ((int x, int y) in insertedBlocks[i])
                 {
+                    // 追加ブロック位置からスライドにより盤外に出たブロックの位置を計算
                     int tx = 0, ty = 0;
                     switch (i)
                     {
@@ -24,13 +29,20 @@ namespace Board
                         case 3: tx = x; ty = boardData.fullSize - 1; break;
                     }
 
-                    if (boardData.gridData[tx, ty] == 1) isGameOver = true;
-                    if (boardData.gridData[tx, ty] == 3) 
+                    // 盤外にプレイヤーがいる場合はゲームオーバー
+                    if (boardData.gridData[tx, ty] == boardData.playerNum)
                     {
-                        var enemyUnit = boardData.occupants[tx, ty].GetComponent<Enemies.EnemyUnit>();
-                        enemyUnit.Dead();
+                        playerData.RequestGameOver();
                     }
 
+                    // 盤外に敵がいる場合は敵の死亡処理を呼び出す
+                        if (boardData.gridData[tx, ty] == boardData.enemyNum)
+                        {
+                            var enemyUnit = boardData.occupants[tx, ty].GetComponent<Enemies.EnemyUnit>();
+                            enemyUnit.Dead();
+                        }
+
+                    // ブロック・占有オブジェクトをリリースして盤面データを空にする
                     boardData.gridObjects[tx, ty].Release();
                     boardData.occupants[tx, ty]?.Release();
                     boardData.SetGridData(0, tx, ty);
@@ -39,7 +51,7 @@ namespace Board
                 }
             }
 
-            return isGameOver;
+            return;
         }
     }
 }

@@ -1,16 +1,21 @@
 using UnityEngine;
+using SkyRuins.Common;
 
-namespace Enemies
+namespace SkyRuins.Enemies
 {
+    // 敵のアニメーションを管理するクラス
+
     public class EnemyAnimation : MonoBehaviour
     {
-        private Animator anim;
+        private Animator anim; // アニメーターコンポーネント
 
+        // 初期化関数
         public void Initialize()
         {
             anim = GetComponent<Animator>();
         }
 
+        // 敵の向きを設定する関数
         public void SetDirection(Direction dir)
         {
             switch (dir)
@@ -30,17 +35,20 @@ namespace Enemies
             }
         }
 
+        // 攻撃アニメーションを再生する関数
         public void PlayAttack()
         {
             Debug.Log("Enemy Attack Animation");
             anim.SetTrigger("isAttack");
         }
 
+        // ダメージアニメーションを再生する関数
         public void PlayDamage()
         {
             anim.SetTrigger("isDamage");
         }
 
+        // 死亡アニメーションを再生する関数
         public void PlayDead()
         {
             anim.SetTrigger("isDead");

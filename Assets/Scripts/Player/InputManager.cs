@@ -1,11 +1,15 @@
 using UnityEngine;
+using SkyRuins.Common;
 
-namespace Player
+namespace SkyRuins.Player
 {
+    // プレイヤーの入力を管理するクラス
+
     public class InputManager : MonoBehaviour
     {
         public InputCommand GetInput()
         {
+            // 矢印キーで移動、Zキーで決定、Xキーでキャンセル
             if (Input.GetKeyDown(KeyCode.UpArrow))
             {
                 AudioManager.Instance.PlaySE(SEType.Select);
@@ -29,7 +33,7 @@ namespace Player
                 AudioManager.Instance.PlaySE(SEType.Select);
                 return InputCommand.Right;
             }
-            
+
             if (Input.GetKeyDown(KeyCode.Z))
             {
                 AudioManager.Instance.PlaySE(SEType.Decide);

@@ -1,60 +1,67 @@
 using System;
 using System.Collections;
-//using System.Collections.Generic;
 using UnityEngine;
-using UI;
+using SkyRuins.UI;
+using SkyRuins.Common;
 
-namespace Player
+namespace SkyRuins.Player
 {
+    // プレイヤーの行動を管理するクラス
+    // 入力に応じて移動、攻撃、魔法、アイテム使用などの処理を担当
+
     public class PlayerManager : MonoBehaviour
     {
-        private Action end;
-        private Action over;
-
+        [Header("References")]
         [SerializeField] private InputManager inputManager;
         [SerializeField] private MoveManager moveManager;
         [SerializeField] private AttackManager attackManager;
         [SerializeField] private MagicManager magicManager;
         [SerializeField] private ItemManager itemManager;
 
+        // コマンド状態とUIを紐づける構造体
         [System.Serializable]
         public struct CommandStruct
         {
-            public CommandState commandState;
-            public CommandUI commandUI;
-            public GameObject commandPanel;
+            public CommandState commandState; // コマンドの状態
+            public CommandUI commandUI; // CommandUIの参照
+            public GameObject commandPanel; // コマンドのUIパネル
         }
 
-        [SerializeField] private CommandStruct[] commands;
+        [SerializeField] private CommandStruct[] commands; // コマンド状態とUIの配列
 
-        private CommandState currentState = CommandState.None;
-        private CommandUI currentUI = null;
+        private Action end; // ターン終了コールバック
+        private CommandState currentState = CommandState.None; // 現在のコマンド状態
+        private CommandUI currentUI = null; // 現在のコマンドUI
 
-        private bool isMoving = false;
-        private bool isMagic = false;
-        private bool isItem = false;
+        private bool isMoving = false; // 移動中フラグ
+        private bool isMagic = false; // 魔法使用中フラグ
+        private bool isItem = false; // アイテム使用中フラグ
 
+        // プレイヤーの初期化関数
         public void InitPlayer()
         {
+            // 各マネージャーのアニメーション設定
             moveManager.SetAnimation();
             attackManager.SetAnimation();
             magicManager.SetAnimation();
         }
 
-        public void StartPlayerTurn(Action turnEnd, Action gameOver)
+        // プレイヤーターンの開始関数
+        public void StartPlayerTurn(Action turnEnd)
         {
             end = turnEnd;
-            over = gameOver;
             ChangeState(CommandState.MainSelect);
             Debug.Log("Player Turn START");
         }
 
+        // ターン終了の遅延処理
         private IEnumerator EndTurnDelay()
         {
             yield return new WaitForSeconds(0.2f);
             EndTurn();
         }
 
+        // ターン終了関数
         public void EndTurn()
         {
             Debug.Log("Player Turn END");
@@ -64,6 +71,7 @@ namespace Player
 
         void Update()
         {
+            // 現在のコマンド状態に応じて処理を分岐
             switch (currentState)
             {
                 case CommandState.MainSelect:
@@ -96,6 +104,7 @@ namespace Player
             }
         }
 
+        // コマンド状態を変更する関数
         void ChangeState(CommandState newState)
         {
             OnExitState(currentState);
@@ -103,6 +112,7 @@ namespace Player
             currentState = newState;
 
             // 対応するUIだけON
+            // それ以外はOFF
             foreach (var command in commands)
             {
                 if (command.commandState == currentState)
@@ -120,6 +130,7 @@ namespace Player
             OnEnterState(currentState);
         }
 
+        // コマンド状態に入るときの処理
         void OnEnterState(CommandState state)
         {
             switch (state)
@@ -130,6 +141,7 @@ namespace Player
             }
         }
 
+        // コマンド状態から出るときの処理
         void OnExitState(CommandState state)
         {
             switch (state)
@@ -149,6 +161,7 @@ namespace Player
             }
         }
 
+        // メインコマンド選択の処理
         void MainSelect()
         {
             var input = inputManager.GetInput();
@@ -180,6 +193,7 @@ namespace Player
             }
         }
 
+        // 移動方向選択の処理
         void MoveSelect()
         {
             var input = inputManager.GetInput();
@@ -215,6 +229,7 @@ namespace Player
             }
         }
 
+        // 移動処理のコルーチン
         IEnumerator MoveCoroutine()
         {
             isMoving = true;
@@ -223,6 +238,7 @@ namespace Player
             StartCoroutine(EndTurnDelay());
         }
 
+        // 攻撃コマンド選択の処理
         void AttackSelect()
         {
             bool attackFlag = false;
@@ -261,6 +277,7 @@ namespace Player
             }
         }
 
+        // 魔法コマンド選択の処理
         void MagicSelect()
         {
             var input = inputManager.GetInput();
@@ -279,6 +296,7 @@ namespace Player
             ChangeState(CommandState.MagicExecute);
         }
 
+        //　魔法方向選択の処理
         void MagicExecute()
         {
             bool magicFlag = false;
@@ -315,6 +333,7 @@ namespace Player
             }
         }
 
+        // 魔法処理のコルーチン
         IEnumerator MagicCoroutine()
         {
             isMoving = true;
@@ -323,6 +342,7 @@ namespace Player
             StartCoroutine(EndTurnDelay());
         }
 
+        // アイテムコマンド選択の処理
         void ItemSelect()
         {
             var input = inputManager.GetInput();
@@ -341,6 +361,7 @@ namespace Player
             ChangeState(CommandState.ItemExecute);
         }
 
+        // アイテム方向選択の処理
         void ItemExecute()
         {
             bool itemFlag = false;
@@ -377,6 +398,7 @@ namespace Player
             }
         }
 
+        // アイテム処理のコルーチン
         IEnumerator ItemCoroutine()
         {
             isItem = true;

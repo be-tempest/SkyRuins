@@ -1,37 +1,51 @@
 using UnityEngine;
 
-public class SceneManager : MonoBehaviour
+namespace SkyRuins
 {
-    public void OnEnterTitle()
+    // シーン遷移を管理するクラス
+    
+    public class SceneManager : MonoBehaviour
     {
-        // タイトルシーン読み込み
-        UnityEngine.SceneManagement.SceneManager.LoadScene("Title");
-    }
+        public static SceneManager Instance { get; private set; }
 
-    public void OnEnterInGame()
-    {
-        // インゲームシーン読み込み
-        UnityEngine.SceneManagement.SceneManager.LoadScene("InGame");
-    }
-
-    public void OnEnterResult()
-    {
-        // リザルトシーン読み込み
-        UnityEngine.SceneManagement.SceneManager.LoadScene("Result");
-    }
-
-    public void OnExitGame()
-    {
-        // ゲーム終了
-        if (Application.isEditor)
+        private void Awake()
         {
-            // エディタ上ではプレイモードを停止
-            UnityEditor.EditorApplication.isPlaying = false;
+            // 二重生成防止
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
         }
-        else
+
+        // タイトルシーンへ遷移
+        public void OnEnterTitle()
         {
-            // ビルドされたゲームではアプリケーションを終了
-            Application.Quit();
+            UnityEngine.SceneManagement.SceneManager.LoadScene("Title");
+        }
+
+        // インゲームシーンへ遷移
+        public void OnEnterInGame()
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene("InGame");
+        }
+
+        // ゲーム終了
+        public void OnExitGame()
+        {
+            if (Application.isEditor)
+            {
+                // エディタ上ではプレイモードを停止
+                UnityEditor.EditorApplication.isPlaying = false;
+            }
+            else
+            {
+                // ビルドされたゲームではアプリケーションを終了
+                Application.Quit();
+            }
         }
     }
 }

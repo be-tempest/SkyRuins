@@ -1,23 +1,28 @@
 using UnityEngine;
 using System;
-using Pool;
+using SkyRuins.Player;
+using SkyRuins.Enemies;
 
-
-namespace Board
+namespace SkyRuins.Board
 {
+    // 盤面の初期生成とブロック/占有オブジェクトのスポーンを管理
+    // 占有オブジェクトは確率に基づいて決定
+
     public class BoardSpawner : MonoBehaviour
     {
+        [Header("References")]
         [SerializeField] private BoardData boardData;
-        [SerializeField] private Player.PlayerData playerData;
-        [SerializeField] private Enemies.EnemyRegistry enemyRegistry;
+        [SerializeField] private PlayerData playerData;
+        [SerializeField] private EnemyRegistry enemyRegistry;
 
         // 確率設定
         [Header("Probability")]
-        [SerializeField] private float enemyProb = 0.20f;
+        [SerializeField] private float enemyProb = 0.05f;
         [SerializeField] private float itemProb = 0.05f;
-        [SerializeField] private float obstacleBaseProb = 0.20f;
-        [SerializeField] private float increasePerLevel = 0.02f;
+        [SerializeField] private float obstacleBaseProb = 0.05f;
+        [SerializeField] private float increasePerLevel = 0.01f;
 
+        // ObjectPool 参照
         [Header("ObjectPool")]
         [SerializeField] private ObjectPool[] blockPools = new ObjectPool[4];
         [SerializeField] private ObjectPool playerPool;
@@ -25,10 +30,10 @@ namespace Board
         [SerializeField] private ObjectPool[] enemyPools;
         [SerializeField] private ObjectPool[] itemPools;
 
-        // 盤面生成
+        // 初期盤面生成
         public void InitBoard(Action gameOver)
         {
-            playerData.OnGameOver += gameOver;
+            playerData.OnGameOver += gameOver; // GameOverイベントをPlayerDataに登録
             boardData.Init();
 
             for (int x = 1; x <= boardData.coreSize; x++)
@@ -39,27 +44,31 @@ namespace Board
                 }
             }
 
+            // 盤面中心にプレイヤーを配置
             int center = (boardData.fullSize - 1) / 2;
             playerData.SetPlayerPos(center, center);
             boardData.SetGridData(boardData.playerNum, center, center);
             SpawnOccupant(boardData.playerNum, center, center);
         }
 
-        // ブロック生成
+        // ブロックの生成
         public void SpawnBlock(int x, int y, int level)
         {
-            if (!boardData.IsValidIndex(x, y)) return;
+            if (!boardData.IsValidIndex(x, y)) return; // 範囲外は無効
 
+            // 既存のブロックをリリース
             if (boardData.gridObjects[x, y] != null)
             {
                 boardData.gridObjects[x, y].Release();
             }
 
+            // 見た目の異なるブロックをランダムに配置
             int index = UnityEngine.Random.Range(0, blockPools.Length);
             PooledObject obj = blockPools[index].GetPooledObject();
-
             obj.transform.position = new Vector3(x, 0f, y);
             boardData.SetGridObjects(obj, x, y);
+
+            // ランダムに占有オブジェクトを配置
             boardData.SetGridData(OccupantProbability(level), x, y);
             if (boardData.gridData[x, y] != 0)
             {
@@ -67,9 +76,10 @@ namespace Board
             }
         }
 
-        // 占有オブジェクト生成
-        void SpawnOccupant(int occupantNum, int x, int y)
+        // 占有オブジェクトの生成
+        private void SpawnOccupant(int occupantNum, int x, int y)
         {
+            // 既存の占有オブジェクトをリリース
             if (boardData.occupants[x, y] != null)
             {
                 boardData.occupants[x, y].Release();
@@ -77,25 +87,26 @@ namespace Board
 
             PooledObject created = null;
 
-            if (occupantNum == boardData.playerNum)
+            // occupantNumに応じてプレイヤー/障害物/敵/アイテムを生成
+            if (occupantNum == boardData.playerNum) // プレイヤー
             {
                 created = playerPool.GetPooledObject();
                 playerData.SetPlayerObject(created);
                 var playerAnim = created.GetComponent<Player.PlayerAnimation>();
                 playerAnim.Initialize(playerData);
             }
-            else if (occupantNum == boardData.obstacleNum)
+            else if (occupantNum == boardData.obstacleNum) // 障害物
             {
                 created = obstaclePool.GetPooledObject();
             }
-            else if (occupantNum == boardData.enemyNum)
+            else if (occupantNum == boardData.enemyNum) // 敵
             {
                 int index = UnityEngine.Random.Range(0, enemyPools.Length);
                 created = enemyPools[index].GetPooledObject();
                 var enemyUnit = created.GetComponent<Enemies.EnemyUnit>();
                 enemyUnit.Init(enemyRegistry, boardData);
             }
-            else
+            else // アイテム
             {
                 int index = UnityEngine.Random.Range(0, itemPools.Length);
                 created = itemPools[index].GetPooledObject();
@@ -106,7 +117,8 @@ namespace Board
             boardData.SetOccupants(created, x, y);
         }
 
-        int OccupantProbability(int level)
+        // レベルに応じた確率で占有オブジェクトを決定
+        private int OccupantProbability(int level)
         {
             float obstacleProb = Mathf.Clamp01(obstacleBaseProb + (level - 1) * increasePerLevel);
             float r = UnityEngine.Random.value;

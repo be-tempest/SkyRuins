@@ -3,38 +3,43 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Board
+namespace SkyRuins.Board
 {
+    // Boardターンの進行を管理
+    // Slide -> Delete -> Add の順で進行
+    // 1ターン目はブロック追加のためAddフェーズのみ
+
     public class BoardManager : MonoBehaviour
     {
+        [Header("References")]
         [SerializeField] private BoardSpawner boardSpawner;
         [SerializeField] private AddManager addManager;
         [SerializeField] private SlideManager slideManager;
         [SerializeField] private DeleteManager deleteManager;
 
-        private Action end;
-        private Action over;
+        private int[] addCount = new int[4]; // 4方向の追加ブロック数 0:左 1:上 2:右 3:下
+        private List<(int x, int y)>[] insertedBlocks = new List<(int, int)>[4]; // 4方向の追加ブロック位置リスト 0:左 1:上 2:右 3:下
+        private Action end; // ターン終了コールバック
 
-        private int[] addCount = new int[4];
-        private List<(int x, int y)>[] insertedBlocks = new List<(int, int)>[4];
-
+        // 盤面初期生成
         public void InitBoard(Action gameOver)
         {
-            // 初期生成
             boardSpawner.InitBoard(gameOver);
         }
 
-        public void StartBoardTurn(int turnCount, Action turnEnd, Action gameOver)
+        // Boardターン開始
+        public void StartBoardTurn(int turnCount, Action turnEnd)
         {
             end = turnEnd;
-            over = gameOver;
             StartCoroutine(BoardTurnRoutine(turnCount));
         }
 
+        //　Boardターン進行コルーチン
         private IEnumerator BoardTurnRoutine(int turnCount)
         {
             LevelUp(turnCount);
 
+            // 1ターン目はAddフェーズのみ
             if (turnCount == 1)
             {
                 yield return StartCoroutine(AddPhase(turnCount));
@@ -49,21 +54,21 @@ namespace Board
             end?.Invoke();
         }
 
+        // Addフェーズ：ブロックの追加と位置の記録
         private IEnumerator AddPhase(int turnCount)
         {
-            // AddManager に任せる
             for (int i = 0; i < 4; i++)
             {
                 insertedBlocks[i] = new List<(int, int)>();
             }
 
-            insertedBlocks = addManager.AddBlocks(addCount);
+            insertedBlocks = addManager.AddBlocks(addCount); // 追加ブロックの位置を取得
 
             for (int i = 0; i < 4; i++)
             {
                 foreach ((int x, int y) in insertedBlocks[i])
                 {
-                    boardSpawner.SpawnBlock(x, y, turnCount);
+                    boardSpawner.SpawnBlock(x, y, turnCount); // ブロックを生成
                 }
             }
 
@@ -71,22 +76,20 @@ namespace Board
 
         }
 
+        // Slideフェーズ：ブロックのスライド
         private IEnumerator SlidePhase()
         {
-            // SlideManager に任せる
             yield return StartCoroutine(slideManager.SlideBlocks(insertedBlocks));
-            //yield return null;
         }
 
+        // Deleteフェーズ：盤面外に出たブロックの削除
         private IEnumerator DeletePhase()
         {
-            // DeleteManager に任せる
-            bool isGameOver = deleteManager.DeleteBlocks(insertedBlocks);
-            if (isGameOver) over?.Invoke();
+            deleteManager.DeleteBlocks(insertedBlocks);
             yield return null;
         }
 
-        // レベルアップ
+        // レベルアップ：ターン数に応じて追加ブロック数を増加
         void LevelUp(int turnCount)
         {
             int idx = (turnCount - 1) % 4;

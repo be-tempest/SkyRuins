@@ -1,18 +1,23 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using Enemies;
+using SkyRuins.Enemies;
+using SkyRuins.Common;
 
-namespace Player
+namespace SkyRuins.Player
 {
+    // フレイムの実行クラス
+
     public class FlameExecuter : MagicExecuter
     {
+        // 魔法の向きを選択する関数
         public override void DirSelect(Direction dir)
         {
             magicPos.Clear();
             guideManager.Clear();
             attackDir = dir;
 
+            // 向きに応じて魔法の効果範囲の座標を回転させ、ガイドを表示する
             foreach (var pos in magicDef.magicRange)
             {
                 Vector2Int rotatePos = RotatePos(pos, dir);
@@ -27,15 +32,17 @@ namespace Player
             }
         }
 
+        // 魔法の効果を実行する関数
         public override IEnumerator MagicExecute()
         {
             var pos = new Vector3(magicPos[0].x, 0.5f, magicPos[0].y);
             var rot = GetRotation(attackDir);
-            GameObject effect = Instantiate(magicDef.effectPrefab, pos, rot);
+            GameObject effect = Instantiate(magicDef.effectPrefab, pos, rot); // 魔法のエフェクトを生成
             Destroy(effect, 1.5f);
 
             yield return new WaitForSeconds(1.5f);
 
+            // 魔法の効果範囲内の敵にダメージを与える
             foreach (var targetPos in magicPos)
             {
                 if (boardData.gridData[targetPos.x, targetPos.y] == boardData.enemyNum)
@@ -43,12 +50,6 @@ namespace Player
                     var enemyUnit = boardData.occupants[targetPos.x, targetPos.y].GetComponent<EnemyUnit>();
                     enemyUnit.TakeDamage(magicDef.power, targetPos.x, targetPos.y);
                     Debug.Log("Flameで" + magicDef.power + "のダメージを与えた");
-                    // if (enemyUnit.currentHP <= 0)
-                    // {
-                    //     // boardData.occupants[targetPos.x, targetPos.y].Release();
-                    //     // boardData.SetGridData(0, targetPos.x, targetPos.y);
-                    //     // boardData.SetOccupants(null, targetPos.x, targetPos.y);
-                    // }
                 }
             }
         }
